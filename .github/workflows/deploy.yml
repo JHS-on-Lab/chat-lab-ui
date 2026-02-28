@@ -84,4 +84,4 @@ jobs:
 
             export IMAGE_TAG=${{ github.sha }}
 
-            docker compose -f docker-compose.ui.yml up -d --remove-orphans
+            docker compose -f docker-compose.ui.yml up -d
