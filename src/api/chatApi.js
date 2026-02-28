@@ -5,10 +5,6 @@ export const getMyRooms = async () => {
   return data.data
 }
 
-export const getRoomDetail = async () => {
-  return null
-}
-
 export const createRoom = async (payload) => {
   const { data } = await apiClient.post('/chat/rooms', payload)
   return data.data
@@ -26,5 +22,22 @@ export const inviteMember = async (roomId, username) => {
 
 export const getRoomMembers = async (roomId) => {
   const { data } = await apiClient.get(`/chat/rooms/${roomId}/members`)
+  return data.data
+}
+
+export const getRoomMessages = async (roomId, cursor) => {
+  const { data } = await apiClient.get(`/chat/rooms/${roomId}/messages`,
+    {
+      params: {
+        cursor: cursor ?? undefined,
+        size: 20
+      }
+    }
+  )
+  return data.data
+}
+
+export const sendMessage = async (roomId, payload) => {
+  const { data } = await apiClient.post(`/chat/rooms/${roomId}/messages`, payload)
   return data.data
 }

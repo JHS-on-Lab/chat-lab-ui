@@ -1,10 +1,11 @@
 import {
   getMyRooms as getMyRoomsApi,
-  getRoomDetail as getRoomDetailApi,
   createRoom as createRoomApi,
   leaveRoom as leaveRoomApi,
   inviteMember as inviteMemberApi,
   getRoomMembers as getRoomMembersApi,
+  getRoomMessages as getRoomMessagesApi,
+  sendMessage as sendMessageApi,
 } from '@/api/chatApi'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
@@ -13,8 +14,13 @@ export const useChatStore = defineStore('chat', () => {
   // state
   const rooms = ref([])
   const selectedRoomId = ref(null)
+
   const messages = ref({})
   const members = ref({})
+
+  const cursors = ref({})
+  const hasNextMap = ref({})
+  const loadingMap = ref({})
 
   // getters
   const hasRooms = computed(() => rooms.value.length > 0)
@@ -44,15 +50,37 @@ export const useChatStore = defineStore('chat', () => {
   const selectRoom = async (roomId) => {
     selectedRoomId.value = roomId
 
-    await Promise.all([
-      // loadRoomMessages(roomId),
-      loadRoomMembers(roomId)
-    ])
+    if (!messages.value[roomId]) {
+      cursors.value[roomId] = null
+      hasNextMap.value[roomId] = true
+      await loadRoomMessages(roomId)
+    }
+
+    await loadRoomMembers(roomId)
   }
 
   const loadRoomMessages = async (roomId) => {
-    const data = await getRoomMessagesApi(roomId)
-    messages.value[roomId] = data
+    if (loadingMap.value[roomId]) return
+    if (hasNextMap.value[roomId] === false) return
+
+    loadingMap.value[roomId] = true
+
+    const cursor = cursors.value[roomId] || null
+    console.log(roomId, cursor)
+    const res = await getRoomMessagesApi(roomId, cursor)
+    console.log(res)
+    if (!messages.value[roomId]) {
+      messages.value[roomId] = []
+    }
+
+    messages.value[roomId] = [
+      ...res.messages,
+      ...messages.value[roomId]
+    ]
+
+    cursors.value[roomId] = res.nextCursor
+    hasNextMap.value[roomId] = res.hasNext
+    loadingMap.value[roomId] = false
   }
 
   const loadRoomMembers = async (roomId) => {
@@ -64,7 +92,6 @@ export const useChatStore = defineStore('chat', () => {
     if (!messages.value[roomId]) {
       messages.value[roomId] = []
     }
-
     messages.value[roomId].push(message)
   }
 
@@ -75,9 +102,13 @@ export const useChatStore = defineStore('chat', () => {
 
     delete messages.value[roomId]
     delete members.value[roomId]
+    delete cursors.value[roomId]
+    delete hasNextMap.value[roomId]
+    delete loadingMap.value[roomId]
 
     if (selectedRoomId.value === roomId) {
-      selectedRoomId.value = rooms.value.length > 0 ? rooms.value[0].id : null
+      selectedRoomId.value =
+        rooms.value.length > 0 ? rooms.value[0].id : null
     }
   }
 
@@ -86,18 +117,37 @@ export const useChatStore = defineStore('chat', () => {
     await loadRoomMembers(roomId)
   }
 
-  const reset = () => {
-    rooms.value = []
-    selectedRoomId.value = null
-    messages.value = {}
-    members.value = {}
-  }
-
   const createRoom = async (roomName) => {
     const newRoom = await createRoomApi({ name: roomName })
     rooms.value.unshift(newRoom)
     await selectRoom(newRoom.id)
     return newRoom
+  }
+
+  const reset = () => {
+    rooms.value = []
+    selectedRoomId.value = null
+    messages.value = {}
+    members.value = {}
+    cursors.value = {}
+    hasNextMap.value = {}
+    loadingMap.value = {}
+  }
+
+  const sendMessage = async (content) => {
+    if (!selectedRoomId.value) return
+    if (!content.trim()) return
+
+    const message = await sendMessageApi(selectedRoomId.value, {
+      type: 'TEXT',
+      content
+    })
+
+    if (!messages.value[selectedRoomId.value]) {
+      messages.value[selectedRoomId.value] = []
+    }
+
+    messages.value[selectedRoomId.value].push(message)
   }
 
   return {
@@ -110,11 +160,13 @@ export const useChatStore = defineStore('chat', () => {
     currentMembers,
     initialize,
     selectRoom,
-    inviteMember,
+    loadRoomMessages,
     loadRoomMembers,
+    inviteMember,
     addMessage,
     createRoom,
     leaveRoom,
+    sendMessage,
     reset
   }
 })
