@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { signin as signinApi } from '@/api/authApi'
-import { getMyInfo } from '@/services/userService'
+import { getMyInfo as getMyInfoApi } from '@/api/userApi'
 
 export const useAuthStore = defineStore('auth', () => {
   // state
@@ -13,20 +13,20 @@ export const useAuthStore = defineStore('auth', () => {
 
   // actions
   const signin = async (credentials) => {
-try {
-    const accessToken = await signinApi(credentials)
+    try {
+      const accessToken = await signinApi(credentials)
 
-    token.value = accessToken
-    localStorage.setItem('token', token.value)
+      token.value = accessToken
+      localStorage.setItem('token', token.value)
 
-    await fetchMe()
+      await fetchMe()
     } catch (error) {
-      throw error.response
+        throw error.response
     }
   }
 
-   const fetchMe = async () => {
-    const myInfo = await getMyInfo()
+  const fetchMe = async () => {
+    const myInfo = await getMyInfoApi()
     username.value = myInfo.username
     localStorage.setItem('username', username.value)
   }

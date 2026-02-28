@@ -1,9 +1,6 @@
 import apiClient from '@/lib/axios'
 
-export const signup = (payload) => {
-  return apiClient.post('users', payload)
-}
-
-export const getMyInfo = () => {
-  return apiClient.get('users/me')
+export const getMyInfo = async () => {
+  const { data } = await apiClient.get('users/me')
+  return data.data
 }
