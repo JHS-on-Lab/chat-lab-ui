@@ -20,7 +20,7 @@ const isMine = (msg) =>
 
 const handleSend = async () => {
   if (!text.value.trim()) return
-  await chatStore.sendMessage(text.value)
+  chatStore.sendMessage(text.value)
   text.value = ''
 }
 

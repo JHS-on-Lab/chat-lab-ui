@@ -5,8 +5,12 @@ import {
   inviteMember as inviteMemberApi,
   getRoomMembers as getRoomMembersApi,
   getRoomMessages as getRoomMessagesApi,
-  sendMessage as sendMessageApi,
 } from '@/api/chatApi'
+import {
+  connectChatSocket,
+  disconnectChatSocket,
+  sendChatMessage
+} from '@/websocket/chatSocket'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
@@ -48,15 +52,21 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   const selectRoom = async (roomId) => {
+    if (selectedRoomId.value === roomId) return
+
+    // 이전 소켓 종료
+    disconnectChatSocket()
+
     selectedRoomId.value = roomId
 
-    if (!messages.value[roomId]) {
-      cursors.value[roomId] = null
-      hasNextMap.value[roomId] = true
-      await loadRoomMessages(roomId)
-    }
+    // 데이터 로딩
+    await Promise.all([
+      loadRoomMessages(roomId),
+      loadRoomMembers(roomId)
+    ])
 
-    await loadRoomMembers(roomId)
+    // 새 방 소켓 연결
+    connectChatSocket(roomId)
   }
 
   const loadRoomMessages = async (roomId) => {
@@ -66,9 +76,8 @@ export const useChatStore = defineStore('chat', () => {
     loadingMap.value[roomId] = true
 
     const cursor = cursors.value[roomId] || null
-    console.log(roomId, cursor)
     const res = await getRoomMessagesApi(roomId, cursor)
-    console.log(res)
+
     if (!messages.value[roomId]) {
       messages.value[roomId] = []
     }
@@ -98,6 +107,11 @@ export const useChatStore = defineStore('chat', () => {
   const leaveRoom = async (roomId) => {
     await leaveRoomApi(roomId)
 
+    // 현재 방이면 소켓 종료
+    if (selectedRoomId.value === roomId) {
+      disconnectChatSocket()
+    }
+
     rooms.value = rooms.value.filter(r => r.id !== roomId)
 
     delete messages.value[roomId]
@@ -109,6 +123,10 @@ export const useChatStore = defineStore('chat', () => {
     if (selectedRoomId.value === roomId) {
       selectedRoomId.value =
         rooms.value.length > 0 ? rooms.value[0].id : null
+
+      if (selectedRoomId.value) {
+        await selectRoom(selectedRoomId.value)
+      }
     }
   }
 
@@ -124,7 +142,17 @@ export const useChatStore = defineStore('chat', () => {
     return newRoom
   }
 
+  const sendMessage = (text) => {
+    if (!selectedRoomId.value) return
+    sendChatMessage(selectedRoomId.value, {
+      content: text,
+      type: 'TEXT'
+    })
+  }
+
   const reset = () => {
+    disconnectChatSocket()
+
     rooms.value = []
     selectedRoomId.value = null
     messages.value = {}
@@ -132,22 +160,6 @@ export const useChatStore = defineStore('chat', () => {
     cursors.value = {}
     hasNextMap.value = {}
     loadingMap.value = {}
-  }
-
-  const sendMessage = async (content) => {
-    if (!selectedRoomId.value) return
-    if (!content.trim()) return
-
-    const message = await sendMessageApi(selectedRoomId.value, {
-      type: 'TEXT',
-      content
-    })
-
-    if (!messages.value[selectedRoomId.value]) {
-      messages.value[selectedRoomId.value] = []
-    }
-
-    messages.value[selectedRoomId.value].push(message)
   }
 
   return {
