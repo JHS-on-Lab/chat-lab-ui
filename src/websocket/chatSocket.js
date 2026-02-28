@@ -9,7 +9,7 @@ export const connectChatSocket = (roomId) => {
   const authStore = useAuthStore()
   const chatStore = useChatStore()
 
-  const socket = new SockJS('http://localhost:8080/ws/chat')
+  const socket = new SockJS('/ws/chat')
 
   stompClient = new Client({
     webSocketFactory: () => socket,

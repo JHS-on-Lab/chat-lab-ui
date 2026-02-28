@@ -21,7 +21,7 @@ function addRefreshSubscriber(callback) {
  * axios instance
  */
 const apiClient = axios.create({
-  baseURL: 'http://localhost:8080/api',
+  baseURL: '/api',
   withCredentials: true, // refresh token cookie 필수
 })
 
@@ -111,8 +111,8 @@ apiClient.interceptors.response.use(
       return Promise.reject(error.response.data)
     }
 
-    /* CHATROOM 도메인 */
-    if (errorCode.startsWith('CHATROOM_')) {
+    /* CHAT 도메인 */
+    if (errorCode.startsWith('CHAT_')) {
       return Promise.reject(error.response.data)
     }
 

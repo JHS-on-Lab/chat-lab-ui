@@ -18,12 +18,6 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/mypage',
-    name: 'mypage',
-    component: () => import('@/views/user/MyPageView.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
     path: '/:pathMatch(.*)*',
     redirect: '/chat'
   }
