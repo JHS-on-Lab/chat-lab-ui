@@ -1,0 +1,87 @@
+name: UI CI/CD - Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Node setup
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Build Vue
+      - name: Build project
+        run: npm run build
+
+      # 5. AWS OIDC Login
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # 6. ECR Login
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 7. Build Docker Image
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.ECR_REPOSITORY }}:${{ github.sha }} .
+
+      # 8. Tag for ECR
+      - name: Tag image
+        run: |
+          docker tag \
+          ${{ secrets.ECR_REPOSITORY }}:${{ github.sha }} \
+          ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+
+      # 9. Push to ECR
+      - name: Push image
+        run: |
+          docker push \
+          ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+
+      # 10. Deploy to EC2
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            REGION=${{ secrets.AWS_REGION }}
+            REGISTRY=${{ steps.login-ecr.outputs.registry }}
+            IMAGE=$REGISTRY/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+
+            aws ecr get-login-password --region $REGION | \
+            docker login --username AWS --password-stdin $REGISTRY
+
+            docker pull $IMAGE
+
+            cd ~/app/chatlab
+
+            export IMAGE_TAG=${{ github.sha }}
+
+            docker compose -f docker-compose.ui.yml up -d --remove-orphans
