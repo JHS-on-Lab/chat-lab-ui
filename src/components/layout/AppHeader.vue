@@ -1,11 +1,14 @@
 <script setup>
 import { ref } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
+import { useChatStore } from '@/stores/chatStore'
 import { useRouter } from 'vue-router'
 import { addUser } from '@/api/userApi'
 import { modifyUser } from '@/api/userApi'
 
 const authStore = useAuthStore()
+const chatStore = useChatStore()
+
 const router = useRouter()
 
 const hiddenInput = ref('')
@@ -14,9 +17,10 @@ const dialog = ref(false)
 const newUsername = ref('')
 const newPassword = ref('')
 
-function logout() {
+const logout = async () => {
+  chatStore.reset()
   authStore.signout()
-  router.push('/signin')
+  router.replace('/signin')
 }
 
 const handleHiddenInput = async () => {

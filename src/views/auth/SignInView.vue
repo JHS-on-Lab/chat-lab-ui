@@ -2,8 +2,11 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { useChatStore } from '@/stores/chatStore'
 
 const authStore = useAuthStore()
+const chatStore = useChatStore()
+
 const router = useRouter()
 
 const username = ref('')
@@ -12,6 +15,8 @@ const errorMessage = ref('')
 
 const submit = async () => {
   try {
+    chatStore.reset()
+
     await authStore.signin({
       username: username.value,
       password: password.value,
