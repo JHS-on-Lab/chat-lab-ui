@@ -5,7 +5,7 @@ export const getMyRooms = async () => {
   return data.data
 }
 
-export const getRoomDetail = async (id) => {
+export const getRoomDetail = async () => {
   return null
 }
 
@@ -16,4 +16,15 @@ export const createRoom = async (payload) => {
 
 export const leaveRoom = async (roomId) => {
   await apiClient.delete(`/chat/rooms/${roomId}`)
+}
+
+export const inviteMember = async (roomId, username) => {
+  await apiClient.post(`/chat/rooms/${roomId}/members`, {
+    username
+  })
+}
+
+export const getRoomMembers = async (roomId) => {
+  const { data } = await apiClient.get(`/chat/rooms/${roomId}/members`)
+  return data.data
 }

@@ -13,16 +13,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   // actions
   const signin = async (credentials) => {
-    try {
-      const accessToken = await signinApi(credentials)
-
-      token.value = accessToken
-      localStorage.setItem('token', token.value)
-
-      await fetchMe()
-    } catch (error) {
-        throw error.response
-    }
+    const accessToken = await signinApi(credentials)
+    token.value = accessToken
+    localStorage.setItem('token', token.value)
+    await fetchMe()
   }
 
   const fetchMe = async () => {

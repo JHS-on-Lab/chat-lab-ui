@@ -1,4 +1,3 @@
-
 <script setup>
 import { ref } from 'vue'
 import { useChatStore } from '@/stores/chatStore'
@@ -15,9 +14,7 @@ const close = () => {
 
 const create = async () => {
   if (!roomName.value.trim()) return
-
   await chatStore.createRoom(roomName.value)
-
   close()
 }
 
@@ -30,7 +27,7 @@ const leave = async (roomId) => {
   <v-list density="compact">
 
     <!-- 새 채팅방 버튼 -->
-    <v-list-item>
+    <v-list-item class="custom-min-height">
       <v-btn block size="small" @click="dialog = true">
         + New Room
       </v-btn>
@@ -70,3 +67,9 @@ const leave = async (roomId) => {
     </v-card>
   </v-dialog>
 </template>
+
+<style scoped>
+.custom-min-height {
+  min-height: 44px;
+}
+</style>

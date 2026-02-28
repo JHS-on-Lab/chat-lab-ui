@@ -56,14 +56,14 @@ apiClient.interceptors.response.use(
     const errorCode = data?.errorCode
     const originalRequest = error.config
 
-    /**
-     * access token 만료 → reissue
-     */
-    if (
-      status === 401 && errorCode === 'JWT_EXPIRED' && !originalRequest._retry) {
+    if (!errorCode) {
+      return Promise.reject(error)
+    }
+
+    /* JWT 처리 */
+    if (errorCode === 'JWT_EXPIRED' && !originalRequest._retry) {
       originalRequest._retry = true
 
-      // 이미 reissue 중이면 대기
       if (isRefreshing) {
         return new Promise((resolve) => {
           addRefreshSubscriber((newToken) => {
@@ -76,12 +76,10 @@ apiClient.interceptors.response.use(
       isRefreshing = true
 
       try {
-        // refresh token 재발급
         const response = await apiClient.post('/auth/reissue')
         const newToken = response.data.data
 
         authStore.setToken(newToken)
-
         onRefreshed(newToken)
 
         originalRequest.headers.Authorization = `Bearer ${newToken}`
@@ -97,23 +95,25 @@ apiClient.interceptors.response.use(
       }
     }
 
-    if (status === 401) {
-      // 로그인 API에서만 발생하는 인증 실패
-      if (errorCode === 'AUTH_INVALID_CREDENTIALS') {
-        return Promise.reject(error)
-      }
-
-      // 그 외 401 → 토큰 문제
-      alert('로그인이 만료되었습니다. 다시 로그인해주세요.')
+    if (errorCode.startsWith('JWT_')) {
       authStore.signout()
       router.push({ name: 'signin' })
+      return Promise.reject(error.response.data)
     }
 
-    /**
-     * 권한 없음
-     */
-    if (status === 403) {
-      alert('접근 권한이 없습니다.')
+    /* AUTH 도메인 */
+    if (errorCode.startsWith('AUTH_')) {
+      return Promise.reject(error.response.data)
+    }
+
+    /* USER 도메인 */
+    if (errorCode.startsWith('USER_')) {
+      return Promise.reject(error.response.data)
+    }
+
+    /* CHATROOM 도메인 */
+    if (errorCode.startsWith('CHATROOM_')) {
+      return Promise.reject(error.response.data)
     }
 
     return Promise.reject(error)

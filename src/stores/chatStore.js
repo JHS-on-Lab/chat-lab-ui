@@ -1,5 +1,11 @@
-import { createRoom as createRoomApi, leaveRoom as leaveRoomApi  } from '@/api/chatApi'
-import { getMyRooms, getRoomDetail } from '@/api/chatApi'
+import {
+  getMyRooms as getMyRoomsApi,
+  getRoomDetail as getRoomDetailApi,
+  createRoom as createRoomApi,
+  leaveRoom as leaveRoomApi,
+  inviteMember as inviteMemberApi,
+  getRoomMembers as getRoomMembersApi,
+} from '@/api/chatApi'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
@@ -27,30 +33,31 @@ export const useChatStore = defineStore('chat', () => {
 
   // actions
   const initialize = async () => {
-    const data = await getMyRooms()
+    const data = await getMyRoomsApi()
     rooms.value = data
 
     if (rooms.value.length > 0) {
-      selectedRoomId.value = rooms.value[0].id
-      await loadRoomDetail(selectedRoomId.value)
+      await selectRoom(rooms.value[0].id)
     }
   }
 
   const selectRoom = async (roomId) => {
-    if (selectedRoomId.value === roomId) return
-
     selectedRoomId.value = roomId
 
-    if (!messages.value[roomId]) {
-      await loadRoomDetail(roomId)
-    }
+    await Promise.all([
+      // loadRoomMessages(roomId),
+      loadRoomMembers(roomId)
+    ])
   }
 
-  const loadRoomDetail = async (roomId) => {
-    const data = await getRoomDetail(roomId)
+  const loadRoomMessages = async (roomId) => {
+    const data = await getRoomMessagesApi(roomId)
+    messages.value[roomId] = data
+  }
 
-    messages.value[roomId] = data.messages
-    members.value[roomId] = data.members
+  const loadRoomMembers = async (roomId) => {
+    const data = await getRoomMembersApi(roomId)
+    members.value[roomId] = data.map(m => m.username)
   }
 
   const addMessage = (roomId, message) => {
@@ -62,20 +69,21 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   const leaveRoom = async (roomId) => {
-    try {
-      await leaveRoomApi(roomId)
+    await leaveRoomApi(roomId)
 
-      rooms.value = rooms.value.filter(r => r.id !== roomId)
+    rooms.value = rooms.value.filter(r => r.id !== roomId)
 
-      delete messages.value[roomId]
-      delete members.value[roomId]
+    delete messages.value[roomId]
+    delete members.value[roomId]
 
-      if (selectedRoomId.value === roomId) {
-        selectedRoomId.value = rooms.value.length > 0 ? rooms.value[0].id : null
-      }
-    } catch (error) {
-      throw error
+    if (selectedRoomId.value === roomId) {
+      selectedRoomId.value = rooms.value.length > 0 ? rooms.value[0].id : null
     }
+  }
+
+  const inviteMember = async (roomId, username) => {
+    await inviteMemberApi(roomId, username)
+    await loadRoomMembers(roomId)
   }
 
   const reset = () => {
@@ -88,10 +96,7 @@ export const useChatStore = defineStore('chat', () => {
   const createRoom = async (roomName) => {
     const newRoom = await createRoomApi({ name: roomName })
     rooms.value.unshift(newRoom)
-    selectedRoomId.value = newRoom.id
-    messages.value[newRoom.id] = []
-    members.value[newRoom.id] = []
-
+    await selectRoom(newRoom.id)
     return newRoom
   }
 
@@ -105,7 +110,8 @@ export const useChatStore = defineStore('chat', () => {
     currentMembers,
     initialize,
     selectRoom,
-    loadRoomDetail,
+    inviteMember,
+    loadRoomMembers,
     addMessage,
     createRoom,
     leaveRoom,

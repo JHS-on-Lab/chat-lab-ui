@@ -18,8 +18,8 @@ const submit = async () => {
     })
     router.push('/chat')
   } catch (error) {
-    console.log()
-    errorMessage.value = error.data?.message
+    console.log(error)
+    errorMessage.value = error.message
   }
 }
 </script>
