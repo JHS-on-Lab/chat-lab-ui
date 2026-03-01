@@ -83,5 +83,4 @@ jobs:
             cd ~/app/chatlab
 
             export IMAGE_TAG=${{ github.sha }}
-
             docker compose -f docker-compose.ui.yml up -d
