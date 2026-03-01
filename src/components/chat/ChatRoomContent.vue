@@ -64,7 +64,6 @@ watch(
     if (!el) return
 
     el.scrollTop = el.scrollHeight
-    console.log(formatMessage(currentMessages))
   }
 )
 </script>

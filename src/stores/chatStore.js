@@ -7,11 +7,13 @@ import {
   getRoomMessages as getRoomMessagesApi,
 } from '@/api/chatApi'
 import {
-  connectChatSocket,
-  disconnectChatSocket,
+  connectSocket,
+  disconnectSocket,
+  subscribeRoom,
+  unsubscribeRoom,
   sendChatMessage
 } from '@/websocket/chatSocket'
-import { encodeMessage, decodeMessageList } from '@/lib/chatCodec'
+import { decodeMessageList } from '@/lib/chatCodec'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
@@ -44,19 +46,34 @@ export const useChatStore = defineStore('chat', () => {
 
   // actions
   const initialize = async () => {
-    const data = await getMyRoomsApi()
-    rooms.value = data
+    connectSocket()
+
+    await reloadRooms()
 
     if (rooms.value.length > 0) {
       await selectRoom(rooms.value[0].id)
     }
   }
 
+  const reloadRooms = async () => {
+    const data = await getMyRoomsApi()
+
+    const currentSelected = selectedRoomId.value
+
+    rooms.value = data
+
+    // 현재 선택된 방이 여전히 존재하는지 확인
+    if (currentSelected && !rooms.value.find(r => r.id === currentSelected)) {
+      selectedRoomId.value = null
+      unsubscribeRoom()
+    }
+  }
+
   const selectRoom = async (roomId) => {
     if (selectedRoomId.value === roomId) return
 
-    // 이전 소켓 종료
-    disconnectChatSocket()
+    // 이전 방 구독 해제
+    unsubscribeRoom()
 
     selectedRoomId.value = roomId
 
@@ -66,8 +83,8 @@ export const useChatStore = defineStore('chat', () => {
       loadRoomMembers(roomId)
     ])
 
-    // 새 방 소켓 연결
-    connectChatSocket(roomId)
+    // 새 방 구독
+    subscribeRoom(roomId)
   }
 
   const loadRoomMessages = async (roomId) => {
@@ -112,7 +129,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // 현재 방이면 소켓 종료
     if (selectedRoomId.value === roomId) {
-      disconnectChatSocket()
+      unsubscribeRoom()
     }
 
     rooms.value = rooms.value.filter(r => r.id !== roomId)
@@ -155,7 +172,7 @@ const sendMessage = async (text) => {
   }
 
   const reset = () => {
-    disconnectChatSocket()
+    disconnectSocket()
 
     rooms.value = []
     selectedRoomId.value = null
@@ -176,6 +193,7 @@ const sendMessage = async (text) => {
     currentMembers,
     initialize,
     selectRoom,
+    reloadRooms,
     loadRoomMessages,
     loadRoomMembers,
     inviteMember,
