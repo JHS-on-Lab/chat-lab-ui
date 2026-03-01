@@ -18,6 +18,22 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/game',
+    component: () => import('@/views/game/GameView.vue'),
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        redirect: 'dodge'
+      },
+      {
+        path: 'dodge',
+        name: 'dodge',
+        component: () => import('@/views/game/DodgeView.vue')
+      }
+    ]
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/chat'
   }
@@ -33,12 +49,12 @@ router.beforeEach((to, from, next) => {
   const isAuthenticated = !!authStore.token
 
   // 로그인 상태에서 /signin 접근 차단
-  if (to.path === '/signin' && isAuthenticated) {
+  if (to.name === 'signin' && isAuthenticated) {
     return next('/chat')
   }
 
-  // 로그인 필요 페이지 접근 시 인증 체크
-  if (to.path !== '/signin' && !isAuthenticated) {
+  // 인증 필요한 라우트 접근 시
+  if (to.meta.requiresAuth && !isAuthenticated) {
     return next('/signin')
   }
 

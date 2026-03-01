@@ -23,6 +23,14 @@ const logout = async () => {
   router.replace('/signin')
 }
 
+const goChat = () => {
+  router.push('/chat')
+}
+
+const goGame = () => {
+  router.push('/game/dodge')
+}
+
 const handleHiddenInput = async () => {
   const value = hiddenInput.value.trim()
 
@@ -64,11 +72,19 @@ const updateUser = async () => {
     <v-spacer />
 
     <div class="header-right">
-      <span class="text-subtitle-2 username-text clickable" @click="openProfileModal">
-        {{ authStore.username }}
-      </span>
+      <v-btn variant="text" size="small" class="mr-2" @click="goChat">
+        Chat
+      </v-btn>
 
-      <v-btn color="error" variant="text" @click="logout">
+      <v-btn variant="text" size="small" class="mr-2" @click="goGame">
+        Game
+      </v-btn>
+
+      <v-btn variant="text" size="small" class="mr-2" @click="openProfileModal">
+        {{ authStore.username }}
+      </v-btn>
+
+      <v-btn color="error" size="small" variant="text" @click="logout">
         Logout
       </v-btn>
     </div>
@@ -105,11 +121,6 @@ const updateUser = async () => {
   display: flex;
   align-items: center;
   gap: 16px;
-}
-
-.username-text {
-  position: relative;
-  top: 2px;
 }
 
 .clickable {
