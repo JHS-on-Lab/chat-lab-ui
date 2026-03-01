@@ -1,23 +1,23 @@
 import { encrypt, decrypt } from '@/lib/crypto'
 
-export const encodeMessage = async (messageDto) => {
+export const encodeMessage = (messageDto) => {
   if (!messageDto?.content) return messageDto
 
   return {
     ...messageDto,
-    content: await encrypt(messageDto.content)
+    content: encrypt(messageDto.content)
   }
 }
 
-export const decodeMessage = async (messageDto) => {
+export const decodeMessage = (messageDto) => {
   if (!messageDto?.content) return messageDto
 
   return {
     ...messageDto,
-    content: await decrypt(messageDto.content)
+    content: decrypt(messageDto.content)
   }
 }
 
-export const decodeMessageList = async (messages) => {
-  return Promise.all(messages.map(decodeMessage))
+export const decodeMessageList = (messages) => {
+  return messages.map(decodeMessage)
 }

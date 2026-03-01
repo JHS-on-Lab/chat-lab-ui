@@ -1,18 +1,27 @@
-const SECRET_KEY = "chatlab-32byte-secret-key-123456"
-const FIXED_IV = "chatlabiv123"
+const SECRET_KEY = import.meta.env.VITE_CHAT_SECRET_KEY
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
-let cachedKey = null
+const xor = (dataBytes, keyBytes) => {
+  const result = new Uint8Array(dataBytes.length)
+
+  for (let i = 0; i < dataBytes.length; i++) {
+    result[i] = dataBytes[i] ^ keyBytes[i % keyBytes.length]
+  }
+
+  return result
+}
 
 const arrayBufferToBase64 = (buffer) => {
+  let binary = ""
   const bytes = new Uint8Array(buffer)
-  let binary = ''
   const chunkSize = 0x8000
+
   for (let i = 0; i < bytes.length; i += chunkSize) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
   }
+
   return btoa(binary)
 }
 
@@ -20,60 +29,30 @@ const base64ToArrayBuffer = (base64) => {
   const binary = atob(base64)
   const len = binary.length
   const bytes = new Uint8Array(len)
+
   for (let i = 0; i < len; i++) {
     bytes[i] = binary.charCodeAt(i)
   }
+
   return bytes
 }
 
-const normalizeKey = (keyStr) =>
-  encoder.encode(keyStr.padEnd(32, "0").slice(0, 32))
+const keyBytes = encoder.encode(SECRET_KEY)
 
-const normalizeIv = (ivStr) =>
-  encoder.encode(ivStr.padEnd(12, "0").slice(0, 12))
-
-const getCryptoKey = async () => {
-  if (cachedKey) return cachedKey
-
-  cachedKey = await crypto.subtle.importKey(
-    "raw",
-    normalizeKey(SECRET_KEY),
-    { name: "AES-GCM" },
-    false,
-    ["encrypt", "decrypt"]
-  )
-
-  return cachedKey
-}
-
-export const encrypt = async (plainText) => {
+export const encrypt = (plainText) => {
   if (!plainText) return plainText
 
-  const key = await getCryptoKey()
-  const iv = normalizeIv(FIXED_IV)
+  const dataBytes = encoder.encode(plainText)
+  const xored = xor(dataBytes, keyBytes)
 
-  const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
-    key,
-    encoder.encode(plainText)
-  )
-
-  return arrayBufferToBase64(encrypted)
+  return arrayBufferToBase64(xored)
 }
 
-export const decrypt = async (cipherText) => {
+export const decrypt = (cipherText) => {
   if (!cipherText) return cipherText
 
-  const key = await getCryptoKey()
-  const iv = normalizeIv(FIXED_IV)
+  const dataBytes = base64ToArrayBuffer(cipherText)
+  const xored = xor(dataBytes, keyBytes)
 
-  const bytes = base64ToArrayBuffer(cipherText)
-
-  const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv },
-    key,
-    bytes
-  )
-
-  return decoder.decode(decrypted)
+  return decoder.decode(xored)
 }
