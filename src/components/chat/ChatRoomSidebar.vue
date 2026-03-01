@@ -1,8 +1,10 @@
 <script setup>
 import { ref } from 'vue'
 import { useChatStore } from '@/stores/chatStore'
+import { useDisplay } from 'vuetify'
 
 const chatStore = useChatStore()
+const { smAndDown } = useDisplay()
 
 const dialog = ref(false)
 const roomName = ref('')
@@ -27,10 +29,11 @@ const leave = async (roomId) => {
   <v-list density="compact">
 
     <!-- 새 채팅방 버튼 -->
-    <v-list-item class="custom-min-height">
-      <v-btn block size="small" @click="dialog = true">
-        + New Room
-      </v-btn>
+    <v-list-item class="create-room-btn-wrapper" @click="dialog = true" link>
+      <v-list-item-title class="d-flex align-center justify-center">
+        <v-icon start size="x-small">mdi-plus</v-icon>
+        <span v-if="!smAndDown">New Room</span>
+      </v-list-item-title>
     </v-list-item>
 
     <v-divider />
@@ -69,7 +72,9 @@ const leave = async (roomId) => {
 </template>
 
 <style scoped>
-.custom-min-height {
+.create-room-btn-wrapper {
   min-height: 44px;
+  display: flex;
+  justify-content: center;
 }
 </style>

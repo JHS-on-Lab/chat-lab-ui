@@ -3,12 +3,15 @@ import { computed, ref, watch, nextTick } from 'vue'
 import { useChatStore } from '@/stores/chatStore'
 import { useAuthStore } from '@/stores/authStore'
 import { formatMessage } from '@/lib/textFormatter'
+import { useDisplay } from 'vuetify'
 
 const chatStore = useChatStore()
 const authStore = useAuthStore()
+const { smAndDown } = useDisplay()
 
 const text = ref('')
 const dialog = ref(false)
+const memberDialog = ref(false)
 const inviteUsername = ref('')
 const errorMessage = ref('')
 const scrollBox = ref(null)
@@ -75,17 +78,28 @@ watch(
 
   <div v-else class="chat-root">
 
-    <!-- 상단 -->
     <div class="chat-header">
-      <div>
-        <v-chip v-for="member in currentMembers" :key="member" size="small" class="mr-2">
-          {{ member }}
-        </v-chip>
+
+      <!-- 왼쪽 영역 -->
+      <div class="left-area">
+        <!-- 데스크탑: chip 표시 -->
+        <template v-if="!smAndDown">
+          <v-chip v-for="member in currentMembers" :key="member" size="small" class="mr-2">
+            {{ member }}
+          </v-chip>
+        </template>
+
+        <!-- 모바일: Members 버튼 -->
+        <v-btn v-else size="small" variant="text" @click="memberDialog = true">
+          Members
+        </v-btn>
       </div>
 
+      <!-- 오른쪽 영역 (항상 끝) -->
       <v-btn size="small" variant="text" @click="dialog = true">
         Invite
       </v-btn>
+
     </div>
 
     <!-- 메시지 영역 -->
@@ -142,6 +156,23 @@ watch(
         <v-spacer />
         <v-btn text @click="dialog = false">Cancel</v-btn>
         <v-btn @click="invite">Invite</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="memberDialog" width="400">
+    <v-card>
+      <v-card-title>Members</v-card-title>
+
+      <v-card-text>
+        <v-chip v-for="member in currentMembers" :key="member" size="small" class="ma-1">
+          {{ member }}
+        </v-chip>
+      </v-card-text>
+
+      <v-card-actions>
+        <v-spacer />
+        <v-btn text @click="memberDialog = false">Close</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
