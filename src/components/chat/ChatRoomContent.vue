@@ -2,6 +2,7 @@
 import { computed, ref, watch, nextTick } from 'vue'
 import { useChatStore } from '@/stores/chatStore'
 import { useAuthStore } from '@/stores/authStore'
+import { formatMessage } from '@/lib/textFormatter'
 
 const chatStore = useChatStore()
 const authStore = useAuthStore()
@@ -63,6 +64,7 @@ watch(
     if (!el) return
 
     el.scrollTop = el.scrollHeight
+    console.log(formatMessage(currentMessages))
   }
 )
 </script>
@@ -98,9 +100,7 @@ watch(
         <!-- TEXT -->
         <div v-if="msg.type === 'TEXT'" class="bubble-row">
 
-          <div class="bubble">
-            {{ msg.content }}
-          </div>
+          <div class="bubble" v-html="formatMessage(msg.content)" />
 
           <v-btn icon size="x-small" variant="text" class="copy-btn" @click="copyMessage(msg.content)">
             <v-icon size="16">mdi-content-copy</v-icon>
