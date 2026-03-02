@@ -1,6 +1,5 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { defineEmits } from 'vue'
 
 const emit = defineEmits(['game-over'])
 
@@ -35,6 +34,7 @@ const maxSpeed = 10
 const maxObstacles = 500
 
 // ===== 게임 상태 =====
+let waiting = true
 let player
 let obstacles
 let score
@@ -55,7 +55,6 @@ const init = () => {
   obstacles = []
   score = 0
   gameOver = false
-
   skillCount = 0
   lastSkillScore = 0
   shockwave = null
@@ -70,6 +69,15 @@ const init = () => {
 // ===== 입력 =====
 const keydown = e => {
   keys[e.key] = true
+
+  // 시작 대기 상태에서 Enter 누르면 시작
+  if (waiting && e.key === 'Enter') {
+    waiting = false
+    init()
+    difficultyTimer = setInterval(increaseDifficulty, 5000)
+    loop()
+    return
+  }
 
   if (gameOver && e.key === 'Enter') restart()
 
@@ -215,6 +223,12 @@ const update = () => {
 
 // ===== 렌더 =====
 const draw = () => {
+  if (waiting) {
+    ctx.font = '28px Arial'
+    ctx.fillText('Press Enter to Start', WIDTH / 2 - 120, HEIGHT / 2)
+    return
+  }
+  
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, WIDTH, HEIGHT)
 
@@ -265,13 +279,11 @@ const restart = () => init()
 
 onMounted(() => {
   ctx = canvas.value.getContext('2d')
-  init()
 
   window.addEventListener('keydown', keydown)
   window.addEventListener('keyup', keyup)
 
-  difficultyTimer = setInterval(increaseDifficulty, 5000)
-  loop()
+  draw()
 })
 
 onBeforeUnmount(() => {
