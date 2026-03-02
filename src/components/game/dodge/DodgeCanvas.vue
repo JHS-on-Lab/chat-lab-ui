@@ -258,7 +258,7 @@ const draw = () => {
   ctx.fillStyle = '#000'
   ctx.font = '16px Arial'
   ctx.fillText(`Score: ${score}`, 10, 20)
-  ctx.fillText(`Skill: ${skillCount}`, 10, 40)
+  ctx.fillText(`Clear: ${skillCount}`, 10, 40)
 
   if (gameOver) {
     ctx.font = '28px Arial'

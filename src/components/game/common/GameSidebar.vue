@@ -7,7 +7,8 @@ const route = useRoute()
 const { smAndDown } = useDisplay()
 
 const games = [
-  { name: 'Dodge', path: '/game/dodge' }
+  { name: 'Dodge', path: '/game/dodge', icon: 'mdi-motion-play' },
+  { name: 'Grid Rush', path: '/game/grid-rush', icon: 'mdi-grid' }
 ]
 
 const go = (path) => {
@@ -17,10 +18,12 @@ const go = (path) => {
 
 <template>
   <v-list density="compact">
-
+    
     <v-list-item v-for="game in games" :key="game.path" :active="route.path === game.path" @click="go(game.path)" link>
       <v-list-item-title class="d-flex align-center justify-center">
-        <v-icon start size="x-small">mdi-gamepad-variant</v-icon>
+        <v-icon start size="x-small">
+          {{ game.icon }}
+        </v-icon>
         <span v-if="!smAndDown">{{ game.name }}</span>
       </v-list-item-title>
     </v-list-item>

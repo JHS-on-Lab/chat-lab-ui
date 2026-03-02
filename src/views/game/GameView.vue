@@ -1,6 +1,6 @@
 <script setup>
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
-import GameSidebar from '@/components/game/GameSidebar.vue'
+import GameSidebar from '@/components/game/common/GameSidebar.vue'
 </script>
 
 <template>

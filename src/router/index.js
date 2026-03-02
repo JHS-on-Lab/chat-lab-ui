@@ -30,7 +30,12 @@ const routes = [
         path: 'dodge',
         name: 'dodge',
         component: () => import('@/views/game/DodgeView.vue')
-      }
+      },
+      {
+        path: 'grid-rush',
+        name: 'grid-rush',
+        component: () => import('@/views/game/GridRushView.vue')
+      },
     ]
   },
   {

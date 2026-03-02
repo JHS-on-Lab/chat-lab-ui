@@ -2,11 +2,11 @@
 import { ref, onMounted } from 'vue'
 import GameRulePanel from '@/components/game/common/GameRulePanel.vue'
 import ScoreBoard from '@/components/game/common/ScoreBoard.vue'
-import DodgeCanvas from '@/components/game/dodge/DodgeCanvas.vue'
+import GirdRushCanvas from '@/components/game/grid-rush/GirdRushCanvas.vue'
 import { saveScore } from '@/api/gameApi'
 
 const scoreBoardRef = ref(null)
-const GAME_NAME = 'dodge'
+const GAME_NAME = 'grid-rush'
 
 onMounted(() => {
   scoreBoardRef.value.reload(GAME_NAME) // 게임 이름
@@ -21,7 +21,7 @@ const handleGameOver = async ({ score }) => {
 <template>
   <div class="dodge-layout">
     <div class="left">
-      <DodgeCanvas @game-over="handleGameOver" />
+      <GirdRushCanvas @game-over="handleGameOver" />
     </div>
 
     <div class="right">
@@ -32,17 +32,22 @@ const handleGameOver = async ({ score }) => {
       <div class="rule">
         <GameRulePanel>
           <p>
-            사방에서 날아오는 장애물을 피하며 <strong>최대한 오래 버티는 것</strong>이 목표입니다.
+            3x3 그리드에 표시된 <strong>A / S / D / F</strong> 키를
+            <strong>위에서 아래 순서대로</strong> 정확히 입력하는 것이 목표입니다.
           </p>
           <br />
           <p>
-            점수 500점마다 <strong>Clear</strong> 스킬이 1개씩 지급됩니다.<br />
-            <strong>Space</strong> 키를 눌러 Clear를 사용하면
-            플레이어를 중심으로 파장이 퍼지며 모든 장애물이 제거됩니다.
+            올바른 키를 누르면 해당 칸이 제거되며,
+            9개를 모두 제거하면 새로운 그리드가 생성됩니다.
           </p>
           <br />
           <p>
-            시간이 지날수록 장애물의 속도와 생성 밀도가 증가하여 점점 더 어려워집니다.
+            잘못된 키를 입력하면 남은 시간이 <strong>3초 감소</strong>됩니다.
+          </p>
+          <br />
+          <p>
+            제한 시간 <strong>30초</strong> 동안
+            최대한 많은 칸을 제거하세요.
           </p>
         </GameRulePanel>
       </div>
