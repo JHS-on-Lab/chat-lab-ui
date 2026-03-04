@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick, onMounted } from 'vue'
 import { useChatStore } from '@/stores/chatStore'
 import { useAuthStore } from '@/stores/authStore'
 import { formatMessage } from '@/lib/textFormatter'
@@ -58,17 +58,26 @@ const copyMessage = async (text) => {
   }
 }
 
+const scrollToBottom = async () => {
+  await nextTick()
+
+  const el = scrollBox.value
+  if (!el) return
+
+  el.scrollTop = el.scrollHeight
+}
+
+watch(
+  () => chatStore.selectedRoomId,
+  scrollToBottom
+)
+
 watch(
   () => chatStore.messages[chatStore.selectedRoomId]?.length,
-  async () => {
-    await nextTick()
-
-    const el = scrollBox.value
-    if (!el) return
-
-    el.scrollTop = el.scrollHeight
-  }
+  scrollToBottom
 )
+
+onMounted(scrollToBottom)
 </script>
 
 <template>
