@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { signin as signinApi } from '@/api/authApi'
 import { getMyInfo as getMyInfoApi } from '@/api/userApi'
+import router from '@/router'
 
 export const useAuthStore = defineStore('auth', () => {
   // state
@@ -41,6 +42,8 @@ export const useAuthStore = defineStore('auth', () => {
 
     localStorage.removeItem('token')
     localStorage.removeItem('username')
+
+    router.replace('/signin')
   }
 
   return {

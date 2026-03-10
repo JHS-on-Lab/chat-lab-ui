@@ -20,7 +20,6 @@ const newPassword = ref('')
 const logout = async () => {
   chatStore.reset()
   authStore.signout()
-  router.replace('/signin')
 }
 
 const goChat = () => {
