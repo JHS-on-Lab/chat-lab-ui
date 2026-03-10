@@ -9,6 +9,8 @@ const chatStore = useChatStore()
 const authStore = useAuthStore()
 const { smAndDown } = useDisplay()
 
+const MAX_MESSAGE_LENGTH = 20000
+
 const text = ref('')
 const dialog = ref(false)
 const memberDialog = ref(false)
@@ -19,11 +21,24 @@ const scrollBox = ref(null)
 const currentMessages = computed(() => chatStore.currentMessages)
 const currentMembers = computed(() => chatStore.currentMembers)
 
+const isTooLong = computed(() => text.value.length > MAX_MESSAGE_LENGTH)
+
+const messageError = computed(() => {
+  if (!isTooLong.value) return ''
+  return `메시지는 ${MAX_MESSAGE_LENGTH.toLocaleString()}자 이하만 전송할 수 있습니다.`
+})
+
+const canSend = computed(() => {
+  return text.value.trim().length > 0 && !isTooLong.value
+})
+
 const isMine = (msg) =>
   msg.senderName === authStore.username
 
 const handleSend = async () => {
   if (!text.value.trim()) return
+  if (isTooLong.value) return
+
   chatStore.sendMessage(text.value)
   text.value = ''
 }
@@ -89,29 +104,24 @@ onMounted(scrollToBottom)
 
     <div class="chat-header">
 
-      <!-- 왼쪽 영역 -->
       <div class="left-area">
-        <!-- 데스크탑: chip 표시 -->
         <template v-if="!smAndDown">
           <v-chip v-for="member in currentMembers" :key="member" size="small" class="mr-2">
             {{ member }}
           </v-chip>
         </template>
 
-        <!-- 모바일: Members 버튼 -->
         <v-btn v-else size="small" variant="text" @click="memberDialog = true">
           Members
         </v-btn>
       </div>
 
-      <!-- 오른쪽 영역 (항상 끝) -->
       <v-btn size="small" variant="text" @click="dialog = true">
         Invite
       </v-btn>
 
     </div>
 
-    <!-- 메시지 영역 -->
     <div ref="scrollBox" class="messages-area" @scroll="handleScroll">
       <div v-for="msg in currentMessages" :key="msg.id" class="message" :class="{ mine: isMine(msg) }">
 
@@ -119,36 +129,48 @@ onMounted(scrollToBottom)
           {{ msg.senderName }}
         </div>
 
-        <!-- TEXT -->
         <div v-if="msg.type === 'TEXT'" class="bubble-row">
-
           <div class="bubble" v-html="formatMessage(msg.content)" />
 
           <v-btn icon size="x-small" variant="text" class="copy-btn" @click="copyMessage(msg.content)">
             <v-icon size="16">mdi-content-copy</v-icon>
           </v-btn>
-
         </div>
 
-        <!-- IMAGE -->
         <img v-if="msg.type === 'IMAGE'" :src="msg.content" class="bubble image" />
 
       </div>
     </div>
 
-    <!-- 입력 영역 -->
     <div class="input-area">
-      <v-textarea v-model="text" rows="1" auto-grow max-rows="3" no-resize hide-details density="compact"
-        placeholder="메시지 입력..." class="flex-grow-1" @keydown.enter.exact.prevent="handleSend" />
+      <v-textarea
+        v-model="text"
+        rows="1"
+        auto-grow
+        max-rows="3"
+        no-resize
+        density="compact"
+        hide-details="auto"
+        placeholder="메시지 입력..."
+        class="flex-grow-1"
+        counter="20000"
+        :error="isTooLong"
+        :error-messages="messageError ? [messageError] : []"
+        @keydown.enter.exact.prevent="handleSend"
+      />
 
-      <v-btn size="small" class="send-btn" @click="handleSend">
+      <v-btn
+        size="small"
+        class="send-btn"
+        :disabled="!canSend"
+        @click="handleSend"
+      >
         Send
       </v-btn>
     </div>
 
   </div>
 
-  <!-- 초대 다이얼로그 -->
   <v-dialog v-model="dialog" width="400">
     <v-card>
       <v-card-title>Invite Member</v-card-title>
@@ -216,7 +238,6 @@ onMounted(scrollToBottom)
   padding: 16px;
 }
 
-/* 메시지 정렬 */
 .message {
   display: flex;
   flex-direction: column;
@@ -233,7 +254,6 @@ onMounted(scrollToBottom)
   color: #666;
 }
 
-/* 버블 + 복사버튼 라인 */
 .bubble-row {
   display: flex;
   align-items: flex-end;
@@ -244,7 +264,6 @@ onMounted(scrollToBottom)
   flex-direction: row-reverse;
 }
 
-/* 말풍선 */
 .bubble {
   white-space: pre-wrap;
   background: #f5f5f5;
@@ -258,13 +277,11 @@ onMounted(scrollToBottom)
   background: #ffe812;
 }
 
-/* 이미지 */
 .image {
   max-width: 300px;
   border-radius: 12px;
 }
 
-/* 복사 버튼 */
 .copy-btn {
   opacity: 0;
   transition: opacity 0.2s;
@@ -276,16 +293,16 @@ onMounted(scrollToBottom)
   opacity: 1;
 }
 
-/* 입력 영역 */
 .input-area {
   padding: 12px;
   border-top: 1px solid #e0e0e0;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
 }
 
 .send-btn {
   height: 40px;
+  align-self: flex-start;
 }
 </style>

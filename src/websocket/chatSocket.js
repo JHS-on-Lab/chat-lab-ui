@@ -9,28 +9,93 @@ let roomSubscription = null
 let userSubscription = null
 let isConnected = false
 
+const clearSubscriptions = () => {
+  if (userSubscription) {
+    userSubscription.unsubscribe()
+    userSubscription = null
+  }
+
+  if (roomSubscription) {
+    roomSubscription.unsubscribe()
+    roomSubscription = null
+  }
+}
+
+const forceLogout = async () => {
+  const authStore = useAuthStore()
+
+  isConnected = false
+  clearSubscriptions()
+
+  if (stompClient) {
+    stompClient.reconnectDelay = 0
+    await stompClient.deactivate()
+    stompClient = null
+  }
+
+  authStore.signout()
+}
+
+// const isAuthErrorFrame = (frame) => {
+//   const message = frame?.headers?.message ?? ''
+//   const body = frame?.body ?? ''
+//   const errorText = `${message} ${body}`
+
+//   return (
+//     errorText.includes('JWT') ||
+//     errorText.includes('Unauthorized') ||
+//     errorText.includes('UNAUTHORIZED') ||
+//     errorText.includes('Access Denied') ||
+//     errorText.includes('Authentication')
+//   )
+// }
+
 export const connectSocket = () => {
   if (stompClient && stompClient.active) return
 
   const authStore = useAuthStore()
+  const token = authStore.token
 
-  const socket = new SockJS('/ws/chat')
+  if (!token) {
+    forceLogout()
+    return
+  }
 
   stompClient = new Client({
-    webSocketFactory: () => socket,
+    webSocketFactory: () => new SockJS('/ws/chat'),
     connectHeaders: {
-      Authorization: `Bearer ${authStore.token}`
+      Authorization: `Bearer ${token}`
     },
     reconnectDelay: 5000,
-    debug: () => {},
+
     onConnect: () => {
       isConnected = true
       subscribeUserChannel()
+
       const chatStore = useChatStore()
       if (chatStore.selectedRoomId) {
         subscribeRoom(chatStore.selectedRoomId)
       }
-    }
+    },
+
+    onStompError: async (frame) => {
+      console.error('[STOMP ERROR]', frame)
+      isConnected = false
+
+      await forceLogout()
+    },
+
+    onWebSocketClose: (e) => {
+      isConnected = false
+    },
+
+    onWebSocketError: (e) => {
+      console.error('[WS ERROR]', e)
+      isConnected = false
+    },
+
+    splitLargeFrames: true,
+    maxWebSocketChunkSize: 8 * 1024
   })
 
   stompClient.activate()
@@ -75,19 +140,13 @@ export const unsubscribeRoom = () => {
   }
 }
 
-export const disconnectSocket = () => {
-  if (userSubscription) {
-    userSubscription.unsubscribe()
-    userSubscription = null
-  }
-
-  if (roomSubscription) {
-    roomSubscription.unsubscribe()
-    roomSubscription = null
-  }
+export const disconnectSocket = async () => {
+  isConnected = false
+  clearSubscriptions()
 
   if (stompClient) {
-    stompClient.deactivate()
+    stompClient.reconnectDelay = 0
+    await stompClient.deactivate()
     stompClient = null
   }
 }
