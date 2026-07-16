@@ -2,12 +2,14 @@
 import { ref } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useChatStore } from '@/stores/chatStore'
+import { useFileStore } from '@/stores/fileStore'
 import { useRouter } from 'vue-router'
 import { addUser } from '@/api/userApi'
 import { modifyUser } from '@/api/userApi'
 
 const authStore = useAuthStore()
 const chatStore = useChatStore()
+const fileStore = useFileStore()
 
 const router = useRouter()
 
@@ -19,6 +21,7 @@ const newPassword = ref('')
 
 const logout = async () => {
   chatStore.reset()
+  fileStore.reset()
   authStore.signout()
 }
 
@@ -28,6 +31,10 @@ const goChat = () => {
 
 const goGame = () => {
   router.push('/game/dodge')
+}
+
+const goFiles = () => {
+  router.push('/files')
 }
 
 const handleHiddenInput = async () => {
@@ -77,6 +84,10 @@ const updateUser = async () => {
 
       <v-btn variant="text" size="small" class="mr-2" @click="goGame">
         Game
+      </v-btn>
+
+      <v-btn variant="text" size="small" class="mr-2" @click="goFiles">
+        Files
       </v-btn>
 
       <v-btn variant="text" size="small" class="mr-2" @click="openProfileModal">

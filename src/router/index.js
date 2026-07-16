@@ -39,6 +39,23 @@ const routes = [
     ]
   },
   {
+    path: '/files',
+    component: () => import('@/views/files/FilesView.vue'),
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'files-empty',
+        component: () => import('@/views/files/FolderEmptyView.vue')
+      },
+      {
+        path: ':folderId',
+        name: 'folder-detail',
+        component: () => import('@/views/files/FolderDetailView.vue')
+      },
+    ]
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/chat'
   }
