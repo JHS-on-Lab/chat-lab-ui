@@ -13,7 +13,6 @@ import {
   unsubscribeRoom,
   sendChatMessage
 } from '@/websocket/chatSocket'
-import { decodeMessageList } from '@/lib/chatCodec'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
@@ -96,14 +95,12 @@ export const useChatStore = defineStore('chat', () => {
     const cursor = cursors.value[roomId] || null
     const res = await getRoomMessagesApi(roomId, cursor)
 
-    const decodedMessages = await decodeMessageList(res.messages)
-
     if (!messages.value[roomId]) {
       messages.value[roomId] = []
     }
 
     messages.value[roomId] = [
-      ...decodedMessages,
+      ...res.messages,
       ...messages.value[roomId]
     ]
 

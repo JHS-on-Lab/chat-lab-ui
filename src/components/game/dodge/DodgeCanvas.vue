@@ -6,6 +6,8 @@ const emit = defineEmits(['game-over'])
 const endGame = () => {
   if (gameOver) return
   gameOver = true
+  clearInterval(spawnInterval)
+  clearInterval(difficultyTimer)
   emit('game-over', {
     score: score + 1 // 점수 보정
   })
@@ -64,6 +66,9 @@ const init = () => {
   baseSpeed = 3
 
   startSpawning()
+
+  clearInterval(difficultyTimer)
+  difficultyTimer = setInterval(increaseDifficulty, 5000)
 }
 
 // ===== 입력 =====
@@ -74,7 +79,6 @@ const keydown = e => {
   if (waiting && e.key === 'Enter') {
     waiting = false
     init()
-    difficultyTimer = setInterval(increaseDifficulty, 5000)
     loop()
     return
   }

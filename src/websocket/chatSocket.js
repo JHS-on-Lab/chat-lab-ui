@@ -2,7 +2,6 @@ import SockJS from 'sockjs-client'
 import { Client } from '@stomp/stompjs'
 import { useAuthStore } from '@/stores/authStore'
 import { useChatStore } from '@/stores/chatStore'
-import { encodeMessage, decodeMessage } from '@/lib/chatCodec'
 
 let stompClient = null
 let roomSubscription = null
@@ -125,10 +124,9 @@ export const subscribeRoom = (roomId) => {
 
   roomSubscription = stompClient.subscribe(
     `/topic/chat/rooms/${roomId}`,
-    async (message) => {
+    (message) => {
       const body = JSON.parse(message.body)
-      const decoded = await decodeMessage(body.data)
-      chatStore.addMessage(roomId, decoded)
+      chatStore.addMessage(roomId, body.data)
     }
   )
 }
@@ -151,17 +149,11 @@ export const disconnectSocket = async () => {
   }
 }
 
-export const sendChatMessage = async (roomId, payload) => {
+export const sendChatMessage = (roomId, payload) => {
   if (!stompClient || !stompClient.connected) return
 
-  try {
-    const encoded = await encodeMessage(payload)
-
-    stompClient.publish({
-      destination: `/app/chat/rooms/${roomId}`,
-      body: JSON.stringify(encoded)
-    })
-  } catch (e) {
-    console.error('Message encryption failed', e)
-  }
+  stompClient.publish({
+    destination: `/app/chat/rooms/${roomId}`,
+    body: JSON.stringify(payload)
+  })
 }

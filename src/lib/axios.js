@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '@/stores/authStore'
+import { useChatStore } from '@/stores/chatStore'
 import router from '@/router'
 
 /**
@@ -87,6 +88,7 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest)
 
       } catch (reissueError) {
+        useChatStore().reset()
         authStore.signout()
         router.push({ name: 'signin' })
         return Promise.reject(reissueError)
@@ -96,6 +98,7 @@ apiClient.interceptors.response.use(
     }
 
     if (errorCode.startsWith('JWT_')) {
+      useChatStore().reset()
       authStore.signout()
       router.push({ name: 'signin' })
       return Promise.reject(error.response.data)
