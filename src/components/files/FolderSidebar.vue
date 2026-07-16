@@ -12,6 +12,9 @@ const { smAndDown } = useDisplay()
 const dialog = ref(false)
 const folderName = ref('')
 
+const deleteDialog = ref(false)
+const folderToDelete = ref(null)
+
 onMounted(() => {
   fileStore.loadFolders()
 })
@@ -30,6 +33,29 @@ const create = async () => {
 
 const open = (folderId) => {
   router.push(`/files/${folderId}`)
+}
+
+const confirmDelete = (folder) => {
+  folderToDelete.value = folder
+  deleteDialog.value = true
+}
+
+const closeDeleteDialog = () => {
+  deleteDialog.value = false
+  folderToDelete.value = null
+}
+
+const deleteFolder = async () => {
+  const folder = folderToDelete.value
+  if (!folder) return
+
+  await fileStore.deleteFolder(folder.id)
+
+  if (String(folder.id) === route.params.folderId) {
+    router.push('/files')
+  }
+
+  closeDeleteDialog()
 }
 </script>
 
@@ -53,6 +79,11 @@ const open = (folderId) => {
         <v-icon start size="x-small">mdi-folder</v-icon>
         <span v-if="!smAndDown">{{ folder.name }}</span>
       </v-list-item-title>
+
+      <template #append v-if="!smAndDown">
+        <v-btn icon="mdi-delete-outline" size="x-small" variant="text"
+          @click.stop="confirmDelete(folder)" />
+      </template>
     </v-list-item>
 
   </v-list>
@@ -70,6 +101,23 @@ const open = (folderId) => {
         <v-spacer />
         <v-btn text @click="close">Cancel</v-btn>
         <v-btn @click="create">Create</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- 폴더 삭제 확인 Dialog -->
+  <v-dialog v-model="deleteDialog" width="400">
+    <v-card>
+      <v-card-title>Delete Folder</v-card-title>
+
+      <v-card-text>
+        '{{ folderToDelete?.name }}' 폴더와 그 안의 모든 파일이 삭제됩니다. 계속하시겠습니까?
+      </v-card-text>
+
+      <v-card-actions>
+        <v-spacer />
+        <v-btn text @click="closeDeleteDialog">Cancel</v-btn>
+        <v-btn color="error" @click="deleteFolder">Delete</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

@@ -3,6 +3,7 @@ import {
   createFolder as createFolderApi,
   getFiles as getFilesApi,
   createFile as createFileApi,
+  deleteFolder as deleteFolderApi,
   downloadFolder as downloadFolderApi,
 } from '@/api/fileApi'
 import { defineStore } from 'pinia'
@@ -42,6 +43,12 @@ export const useFileStore = defineStore('file', () => {
     return file
   }
 
+  const deleteFolder = async (folderId) => {
+    await deleteFolderApi(folderId)
+    folders.value = folders.value.filter(f => f.id !== Number(folderId))
+    delete filesByFolder.value[folderId]
+  }
+
   const downloadFolder = async (folderId) => {
     const folder = folders.value.find(f => f.id === Number(folderId))
     const blob = await downloadFolderApi(folderId)
@@ -69,6 +76,7 @@ export const useFileStore = defineStore('file', () => {
     createFolder,
     loadFiles,
     createFile,
+    deleteFolder,
     downloadFolder,
     reset
   }
