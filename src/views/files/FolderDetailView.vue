@@ -14,6 +14,12 @@ const filename = ref('')
 const content = ref('')
 
 const previewFile = ref(null)
+const editMode = ref(false)
+const editFilename = ref('')
+const editContent = ref('')
+
+const deleteFileDialog = ref(false)
+const fileToDelete = ref(null)
 
 const folderId = computed(() => route.params.folderId)
 
@@ -87,7 +93,56 @@ const createFile = async () => {
 
 const openPreview = (file) => {
   previewFile.value = file
+  editMode.value = false
   previewDialog.value = true
+}
+
+const startEdit = () => {
+  editFilename.value = `${previewFile.value.title}.${previewFile.value.extension}`
+  editContent.value = previewFile.value.content
+  editMode.value = true
+}
+
+const cancelEdit = () => {
+  editMode.value = false
+}
+
+const saveEdit = async () => {
+  if (!editFilename.value.trim()) return
+
+  const { title, extension } = parseFilename(editFilename.value)
+
+  const updated = await fileStore.updateFile(folderId.value, previewFile.value.id, {
+    title,
+    extension,
+    content: editContent.value
+  })
+
+  previewFile.value = updated
+  editMode.value = false
+}
+
+const confirmDeleteFile = (file) => {
+  fileToDelete.value = file
+  deleteFileDialog.value = true
+}
+
+const closeDeleteFileDialog = () => {
+  deleteFileDialog.value = false
+  fileToDelete.value = null
+}
+
+const deleteFileConfirmed = async () => {
+  const file = fileToDelete.value
+  if (!file) return
+
+  await fileStore.deleteFile(folderId.value, file.id)
+
+  if (previewFile.value?.id === file.id) {
+    previewDialog.value = false
+  }
+
+  closeDeleteFileDialog()
 }
 
 const download = () => {
@@ -119,6 +174,10 @@ const download = () => {
           <v-icon start size="small">mdi-file-outline</v-icon>
           {{ file.title }}.{{ file.extension }}
         </v-list-item-title>
+
+        <template #append>
+          <v-btn icon="mdi-delete-outline" size="x-small" variant="text" @click.stop="confirmDeleteFile(file)" />
+        </template>
       </v-list-item>
     </v-list>
   </div>
@@ -141,18 +200,48 @@ const download = () => {
     </v-card>
   </v-dialog>
 
-  <!-- 파일 미리보기 Dialog -->
+  <!-- 파일 미리보기 / 수정 Dialog -->
   <v-dialog v-model="previewDialog" width="600">
     <v-card>
-      <v-card-title>{{ previewFile?.title }}.{{ previewFile?.extension }}</v-card-title>
+      <v-card-title>{{ editMode ? '파일 수정' : `${previewFile?.title}.${previewFile?.extension}` }}</v-card-title>
 
       <v-card-text>
-        <pre class="preview-content">{{ previewFile?.content }}</pre>
+        <template v-if="editMode">
+          <v-text-field v-model="editFilename" label="파일명" density="compact" />
+          <v-textarea v-model="editContent" label="Content" rows="10" />
+        </template>
+        <pre v-else class="preview-content">{{ previewFile?.content }}</pre>
+      </v-card-text>
+
+      <v-card-actions>
+        <v-btn v-if="!editMode" icon="mdi-delete-outline" variant="text" color="error"
+          @click="confirmDeleteFile(previewFile)" />
+        <v-spacer />
+        <template v-if="editMode">
+          <v-btn text @click="cancelEdit">Cancel</v-btn>
+          <v-btn @click="saveEdit">Save</v-btn>
+        </template>
+        <template v-else>
+          <v-btn text @click="startEdit">Edit</v-btn>
+          <v-btn text @click="previewDialog = false">Close</v-btn>
+        </template>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- 파일 삭제 확인 Dialog -->
+  <v-dialog v-model="deleteFileDialog" width="400">
+    <v-card>
+      <v-card-title>Delete File</v-card-title>
+
+      <v-card-text>
+        '{{ fileToDelete?.title }}.{{ fileToDelete?.extension }}' 파일을 삭제하시겠습니까?
       </v-card-text>
 
       <v-card-actions>
         <v-spacer />
-        <v-btn text @click="previewDialog = false">Close</v-btn>
+        <v-btn text @click="closeDeleteFileDialog">Cancel</v-btn>
+        <v-btn color="error" @click="deleteFileConfirmed">Delete</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

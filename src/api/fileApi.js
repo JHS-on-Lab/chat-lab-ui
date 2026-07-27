@@ -20,6 +20,15 @@ export const createFile = async (folderId, payload) => {
   return data.data
 }
 
+export const updateFile = async (folderId, fileId, payload) => {
+  const { data } = await apiClient.put(`/folders/${folderId}/files/${fileId}`, payload)
+  return data.data
+}
+
+export const deleteFile = async (folderId, fileId) => {
+  await apiClient.delete(`/folders/${folderId}/files/${fileId}`)
+}
+
 export const deleteFolder = async (folderId) => {
   await apiClient.delete(`/folders/${folderId}`)
 }

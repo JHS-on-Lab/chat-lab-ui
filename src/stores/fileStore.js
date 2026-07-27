@@ -3,6 +3,8 @@ import {
   createFolder as createFolderApi,
   getFiles as getFilesApi,
   createFile as createFileApi,
+  updateFile as updateFileApi,
+  deleteFile as deleteFileApi,
   deleteFolder as deleteFolderApi,
 } from '@/api/fileApi'
 import { encodeFile, decodeFile, decodeFileList } from '@/lib/fileCodec'
@@ -57,6 +59,28 @@ export const useFileStore = defineStore('file', () => {
     filesByFolder.value[folderId].push(file)
 
     return file
+  }
+
+  const updateFile = async (folderId, fileId, payload) => {
+    const updated = await updateFileApi(folderId, fileId, encodeFile(payload))
+    const file = decodeFile(updated)
+
+    const list = filesByFolder.value[folderId]
+    if (list) {
+      const idx = list.findIndex(f => f.id === fileId)
+      if (idx !== -1) list[idx] = file
+    }
+
+    return file
+  }
+
+  const deleteFile = async (folderId, fileId) => {
+    await deleteFileApi(folderId, fileId)
+
+    const list = filesByFolder.value[folderId]
+    if (list) {
+      filesByFolder.value[folderId] = list.filter(f => f.id !== fileId)
+    }
   }
 
   // 서버가 하위 폴더까지 재귀적으로 지우므로, 로컬 상태에서도 대상 폴더 + 모든 하위 폴더를 같이 지운다
@@ -124,6 +148,8 @@ export const useFileStore = defineStore('file', () => {
     childrenOf,
     loadFiles,
     createFile,
+    updateFile,
+    deleteFile,
     deleteFolder,
     downloadFolder,
     reset
