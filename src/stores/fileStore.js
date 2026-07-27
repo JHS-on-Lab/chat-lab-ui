@@ -23,11 +23,24 @@ export const useFileStore = defineStore('file', () => {
     folders.value = await getFoldersApi()
   }
 
-  const createFolder = async (name) => {
-    const folder = await createFolderApi({ name })
+  const createFolder = async (name, parentId = null) => {
+    const folder = await createFolderApi({ name, parentId })
     folders.value.unshift(folder)
     return folder
   }
+
+  // 주어진 부모 아래 같은 이름의 폴더가 이미 있으면 그걸 쓰고, 없으면 새로 만든다 (경로 입력으로 폴더 자동 생성 시 사용)
+  const getOrCreateFolder = async (name, parentId) => {
+    const existing = folders.value.find(
+      f => f.name === name && (f.parentId ?? null) === (parentId ?? null)
+    )
+    if (existing) return existing
+
+    return createFolder(name, parentId)
+  }
+
+  const childrenOf = (parentId) =>
+    folders.value.filter(f => (f.parentId ?? null) === (parentId ?? null))
 
   const loadFiles = async (folderId) => {
     const files = await getFilesApi(folderId)
@@ -46,10 +59,23 @@ export const useFileStore = defineStore('file', () => {
     return file
   }
 
+  // 서버가 하위 폴더까지 재귀적으로 지우므로, 로컬 상태에서도 대상 폴더 + 모든 하위 폴더를 같이 지운다
+  const collectSubtreeIds = (folderId) => {
+    const ids = [Number(folderId)]
+
+    for (let i = 0; i < ids.length; i++) {
+      childrenOf(ids[i]).forEach(child => ids.push(child.id))
+    }
+
+    return ids
+  }
+
   const deleteFolder = async (folderId) => {
     await deleteFolderApi(folderId)
-    folders.value = folders.value.filter(f => f.id !== Number(folderId))
-    delete filesByFolder.value[folderId]
+
+    const removedIds = new Set(collectSubtreeIds(folderId))
+    folders.value = folders.value.filter(f => !removedIds.has(f.id))
+    removedIds.forEach(id => delete filesByFolder.value[id])
   }
 
   const resolveUniqueEntryName = (file, nameCounts) => {
@@ -94,6 +120,8 @@ export const useFileStore = defineStore('file', () => {
     hasFolders,
     loadFolders,
     createFolder,
+    getOrCreateFolder,
+    childrenOf,
     loadFiles,
     createFile,
     deleteFolder,

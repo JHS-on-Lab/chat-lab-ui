@@ -1,9 +1,10 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useFileStore } from '@/stores/fileStore'
 
 const route = useRoute()
+const router = useRouter()
 const fileStore = useFileStore()
 
 const createDialog = ref(false)
@@ -53,12 +54,33 @@ const parseFilename = (name) => {
   }
 }
 
+// "docs/guide.md"처럼 경로를 입력하면 없는 폴더는 자동 생성하면서 그 안에 파일을 만든다
+const resolveTargetFolder = async (path) => {
+  const segments = path.split('/').map(s => s.trim()).filter(Boolean)
+  const filePart = segments.pop() ?? ''
+
+  let parentId = Number(folderId.value)
+  for (const folderName of segments) {
+    const folder = await fileStore.getOrCreateFolder(folderName, parentId)
+    parentId = folder.id
+  }
+
+  return { targetFolderId: parentId, filePart }
+}
+
 const createFile = async () => {
   if (!filename.value.trim()) return
 
-  const { title, extension } = parseFilename(filename.value)
+  const { targetFolderId, filePart } = await resolveTargetFolder(filename.value)
+  if (!filePart) return
 
-  await fileStore.createFile(folderId.value, { title, extension, content: content.value })
+  const { title, extension } = parseFilename(filePart)
+
+  await fileStore.createFile(targetFolderId, { title, extension, content: content.value })
+
+  if (String(targetFolderId) !== folderId.value) {
+    router.push(`/files/${targetFolderId}`)
+  }
 
   closeCreateDialog()
 }
@@ -107,7 +129,7 @@ const download = () => {
       <v-card-title>Create File</v-card-title>
 
       <v-card-text>
-        <v-text-field v-model="filename" label="파일명 (예: notes.md)" density="compact" />
+        <v-text-field v-model="filename" label="파일명 (예: docs/notes.md)" density="compact" />
         <v-textarea v-model="content" label="Content" rows="8" />
       </v-card-text>
 

@@ -1,8 +1,9 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useFileStore } from '@/stores/fileStore'
 import { useDisplay } from 'vuetify'
+import FolderTreeNode from '@/components/files/FolderTreeNode.vue'
 
 const fileStore = useFileStore()
 const router = useRouter()
@@ -11,28 +12,33 @@ const { smAndDown } = useDisplay()
 
 const dialog = ref(false)
 const folderName = ref('')
+const createParentId = ref(null)
 
 const deleteDialog = ref(false)
 const folderToDelete = ref(null)
+
+const rootFolders = computed(() => fileStore.childrenOf(null))
 
 onMounted(() => {
   fileStore.loadFolders()
 })
 
+const openCreateDialog = (parentId = null) => {
+  createParentId.value = parentId
+  dialog.value = true
+}
+
 const close = () => {
   dialog.value = false
   folderName.value = ''
+  createParentId.value = null
 }
 
 const create = async () => {
   if (!folderName.value.trim()) return
-  const folder = await fileStore.createFolder(folderName.value)
+  const folder = await fileStore.createFolder(folderName.value, createParentId.value)
   close()
   router.push(`/files/${folder.id}`)
-}
-
-const open = (folderId) => {
-  router.push(`/files/${folderId}`)
 }
 
 const confirmDelete = (folder) => {
@@ -62,8 +68,8 @@ const deleteFolder = async () => {
 <template>
   <v-list density="compact">
 
-    <!-- 새 폴더 버튼 -->
-    <v-list-item class="create-folder-btn-wrapper" @click="dialog = true" link>
+    <!-- 새 폴더 버튼 (최상위) -->
+    <v-list-item class="create-folder-btn-wrapper" @click="openCreateDialog(null)" link>
       <v-list-item-title class="d-flex align-center justify-center">
         <v-icon start size="x-small">mdi-plus</v-icon>
         <span v-if="!smAndDown">New Folder</span>
@@ -72,19 +78,15 @@ const deleteFolder = async () => {
 
     <v-divider />
 
-    <!-- 폴더 목록 -->
-    <v-list-item v-for="folder in fileStore.folders" :key="folder.id"
-      :active="String(folder.id) === route.params.folderId" @click="open(folder.id)" link>
-      <v-list-item-title class="d-flex align-center justify-center">
-        <v-icon start size="x-small">mdi-folder</v-icon>
-        <span v-if="!smAndDown">{{ folder.name }}</span>
-      </v-list-item-title>
-
-      <template #append v-if="!smAndDown">
-        <v-btn icon="mdi-delete-outline" size="x-small" variant="text"
-          @click.stop="confirmDelete(folder)" />
-      </template>
-    </v-list-item>
+    <!-- 폴더 트리 -->
+    <FolderTreeNode
+      v-for="folder in rootFolders"
+      :key="folder.id"
+      :folder="folder"
+      :depth="0"
+      @add-subfolder="openCreateDialog"
+      @delete-request="confirmDelete"
+    />
 
   </v-list>
 
@@ -111,7 +113,7 @@ const deleteFolder = async () => {
       <v-card-title>Delete Folder</v-card-title>
 
       <v-card-text>
-        '{{ folderToDelete?.name }}' 폴더와 그 안의 모든 파일이 삭제됩니다. 계속하시겠습니까?
+        '{{ folderToDelete?.name }}' 폴더와 그 안의 모든 하위 폴더/파일이 삭제됩니다. 계속하시겠습니까?
       </v-card-text>
 
       <v-card-actions>
