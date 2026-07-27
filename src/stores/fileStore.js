@@ -110,15 +110,43 @@ export const useFileStore = defineStore('file', () => {
     return count === 1 ? baseName : `${file.title}(${count}).${file.extension}`
   }
 
+  // 대상 폴더를 기준으로 자기 자신('') + 모든 하위 폴더를 zip 안에서의 상대 경로에 매핑한다
+  const buildFolderPathMap = (rootId) => {
+    const paths = new Map([[rootId, '']])
+    const queue = [rootId]
+
+    for (let i = 0; i < queue.length; i++) {
+      const currentId = queue[i]
+      const currentPath = paths.get(currentId)
+
+      for (const child of childrenOf(currentId)) {
+        paths.set(child.id, currentPath ? `${currentPath}/${child.name}` : child.name)
+        queue.push(child.id)
+      }
+    }
+
+    return paths
+  }
+
   const downloadFolder = async (folderId) => {
-    const folder = folders.value.find(f => f.id === Number(folderId))
-    const files = decodeFileList(await getFilesApi(folderId))
+    const rootId = Number(folderId)
+    const folder = folders.value.find(f => f.id === rootId)
+    const folderPaths = buildFolderPathMap(rootId)
 
     const zip = new JSZip()
-    const nameCounts = new Map()
+    const nameCountsByDir = new Map()
 
-    for (const file of files) {
-      zip.file(resolveUniqueEntryName(file, nameCounts), file.content ?? '')
+    for (const [id, dirPath] of folderPaths) {
+      const files = decodeFileList(await getFilesApi(id))
+      if (files.length === 0) continue
+
+      if (!nameCountsByDir.has(dirPath)) nameCountsByDir.set(dirPath, new Map())
+      const nameCounts = nameCountsByDir.get(dirPath)
+
+      for (const file of files) {
+        const entryName = resolveUniqueEntryName(file, nameCounts)
+        zip.file(dirPath ? `${dirPath}/${entryName}` : entryName, file.content ?? '')
+      }
     }
 
     const blob = await zip.generateAsync({ type: 'blob' })
