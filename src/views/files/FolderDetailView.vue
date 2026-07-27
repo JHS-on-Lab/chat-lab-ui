@@ -6,13 +6,10 @@ import { useFileStore } from '@/stores/fileStore'
 const route = useRoute()
 const fileStore = useFileStore()
 
-const extensionOptions = ['txt', 'md', 'json', 'js', 'html', 'css', 'py', 'java']
-
 const createDialog = ref(false)
 const previewDialog = ref(false)
 
-const title = ref('')
-const extension = ref('txt')
+const filename = ref('')
 const content = ref('')
 
 const previewFile = ref(null)
@@ -36,19 +33,32 @@ watch(folderId, loadFiles)
 
 const closeCreateDialog = () => {
   createDialog.value = false
-  title.value = ''
-  extension.value = 'txt'
+  filename.value = ''
   content.value = ''
 }
 
-const createFile = async () => {
-  if (!title.value.trim() || !extension.value.trim()) return
+// "notes.md" -> { title: 'notes', extension: 'md' }. 점이 없거나 끝에 있으면 기본 확장자 txt로 처리.
+// "archive.tar.gz"처럼 점이 여러 개면 마지막 점 기준으로 나눔.
+const parseFilename = (name) => {
+  const trimmed = name.trim()
+  const lastDot = trimmed.lastIndexOf('.')
 
-  await fileStore.createFile(folderId.value, {
-    title: title.value,
-    extension: extension.value,
-    content: content.value
-  })
+  if (lastDot <= 0 || lastDot === trimmed.length - 1) {
+    return { title: trimmed.replace(/\.$/, ''), extension: 'txt' }
+  }
+
+  return {
+    title: trimmed.slice(0, lastDot),
+    extension: trimmed.slice(lastDot + 1)
+  }
+}
+
+const createFile = async () => {
+  if (!filename.value.trim()) return
+
+  const { title, extension } = parseFilename(filename.value)
+
+  await fileStore.createFile(folderId.value, { title, extension, content: content.value })
 
   closeCreateDialog()
 }
@@ -97,8 +107,7 @@ const download = () => {
       <v-card-title>Create File</v-card-title>
 
       <v-card-text>
-        <v-text-field v-model="title" label="Title" density="compact" />
-        <v-combobox v-model="extension" :items="extensionOptions" label="Extension" density="compact" />
+        <v-text-field v-model="filename" label="파일명 (예: notes.md)" density="compact" />
         <v-textarea v-model="content" label="Content" rows="8" />
       </v-card-text>
 
