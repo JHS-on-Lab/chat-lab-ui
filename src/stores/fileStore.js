@@ -4,8 +4,9 @@ import {
   getFiles as getFilesApi,
   createFile as createFileApi,
   deleteFolder as deleteFolderApi,
-  downloadFolder as downloadFolderApi,
 } from '@/api/fileApi'
+import { encodeFile, decodeFile, decodeFileList } from '@/lib/fileCodec'
+import JSZip from 'jszip'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
@@ -29,11 +30,13 @@ export const useFileStore = defineStore('file', () => {
   }
 
   const loadFiles = async (folderId) => {
-    filesByFolder.value[folderId] = await getFilesApi(folderId)
+    const files = await getFilesApi(folderId)
+    filesByFolder.value[folderId] = decodeFileList(files)
   }
 
   const createFile = async (folderId, payload) => {
-    const file = await createFileApi(folderId, payload)
+    const created = await createFileApi(folderId, encodeFile(payload))
+    const file = decodeFile(created)
 
     if (!filesByFolder.value[folderId]) {
       filesByFolder.value[folderId] = []
@@ -49,9 +52,26 @@ export const useFileStore = defineStore('file', () => {
     delete filesByFolder.value[folderId]
   }
 
+  const resolveUniqueEntryName = (file, nameCounts) => {
+    const baseName = `${file.title}.${file.extension}`
+    const count = (nameCounts.get(baseName) ?? 0) + 1
+    nameCounts.set(baseName, count)
+
+    return count === 1 ? baseName : `${file.title}(${count}).${file.extension}`
+  }
+
   const downloadFolder = async (folderId) => {
     const folder = folders.value.find(f => f.id === Number(folderId))
-    const blob = await downloadFolderApi(folderId)
+    const files = decodeFileList(await getFilesApi(folderId))
+
+    const zip = new JSZip()
+    const nameCounts = new Map()
+
+    for (const file of files) {
+      zip.file(resolveUniqueEntryName(file, nameCounts), file.content ?? '')
+    }
+
+    const blob = await zip.generateAsync({ type: 'blob' })
 
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')

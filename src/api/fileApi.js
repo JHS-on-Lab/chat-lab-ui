@@ -23,10 +23,3 @@ export const createFile = async (folderId, payload) => {
 export const deleteFolder = async (folderId) => {
   await apiClient.delete(`/folders/${folderId}`)
 }
-
-export const downloadFolder = async (folderId) => {
-  const response = await apiClient.get(`/folders/${folderId}/download`, {
-    responseType: 'blob'
-  })
-  return response.data
-}
