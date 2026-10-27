@@ -9,7 +9,8 @@ const chatStore = useChatStore()
 const authStore = useAuthStore()
 const { smAndDown } = useDisplay()
 
-const MAX_MESSAGE_LENGTH = 20000
+// 한글 기준 UTF-8(3B) -> Base64(x4/3) 인코딩 후에도 서버 WebSocket 메시지 한도(128KB)를 넘지 않는 최대치
+const MAX_MESSAGE_LENGTH = 30000
 
 const text = ref('')
 const dialog = ref(false)
