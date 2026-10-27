@@ -28,6 +28,11 @@ export const linkify = (text) => {
   })
 }
 
+// 이미지 메시지는 인라인 이미지(data:image/...)만 허용 → 외부 URL 로드로 인한 IP 노출 방지
+export const isSafeImageSrc = (src) => {
+  return typeof src === 'string' && /^data:image\/(png|jpe?g|gif|webp);base64,/i.test(src)
+}
+
 // 최종 포맷터
 export const formatMessage = (text) => {
   if (typeof text !== 'string') return ''

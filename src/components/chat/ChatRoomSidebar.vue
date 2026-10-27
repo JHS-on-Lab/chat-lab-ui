@@ -8,20 +8,31 @@ const { smAndDown } = useDisplay()
 
 const dialog = ref(false)
 const roomName = ref('')
+const errorMessage = ref('')
 
 const close = () => {
   dialog.value = false
   roomName.value = ''
+  errorMessage.value = ''
 }
 
 const create = async () => {
   if (!roomName.value.trim()) return
-  await chatStore.createRoom(roomName.value)
-  close()
+
+  try {
+    await chatStore.createRoom(roomName.value.trim())
+    close()
+  } catch (e) {
+    errorMessage.value = e.message
+  }
 }
 
 const leave = async (roomId) => {
-  await chatStore.leaveRoom(roomId)
+  try {
+    await chatStore.leaveRoom(roomId)
+  } catch (e) {
+    console.error('채팅방 나가기 실패', e)
+  }
 }
 </script>
 
@@ -60,6 +71,10 @@ const leave = async (roomId) => {
 
       <v-card-text>
         <v-text-field v-model="roomName" label="Room Name" density="compact" @keyup.enter="create" />
+
+        <v-alert v-if="errorMessage" type="error" variant="tonal" density="comfortable">
+          {{ errorMessage }}
+        </v-alert>
       </v-card-text>
 
       <v-card-actions>

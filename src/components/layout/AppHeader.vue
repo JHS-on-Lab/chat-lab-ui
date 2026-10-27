@@ -1,68 +1,43 @@
 <script setup>
 import { ref } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
-import { useChatStore } from '@/stores/chatStore'
-import { useFileStore } from '@/stores/fileStore'
-import { useRouter } from 'vue-router'
-import { addUser } from '@/api/userApi'
 import { modifyUser } from '@/api/userApi'
+import { refreshAccessToken } from '@/lib/axios'
 
 const authStore = useAuthStore()
-const chatStore = useChatStore()
-const fileStore = useFileStore()
 
-const router = useRouter()
-
-const hiddenInput = ref('')
 const dialog = ref(false)
 
+const currentPassword = ref('')
 const newUsername = ref('')
 const newPassword = ref('')
-
-const logout = async () => {
-  chatStore.reset()
-  fileStore.reset()
-  authStore.signout()
-}
-
-const goChat = () => {
-  router.push('/chat')
-}
-
-const goGame = () => {
-  router.push('/game/dodge')
-}
-
-const goFiles = () => {
-  router.push('/files')
-}
-
-const handleHiddenInput = async () => {
-  const value = hiddenInput.value.trim()
-
-  if (!value.startsWith('createuser_')) return
-
-  const parts = value.split('_')
-
-  if (parts.length !== 3) return
-
-  const username = parts[1]
-  const password = parts[2]
-
-  await addUser({ username, password })
-
-  hiddenInput.value = ''
-}
+const profileError = ref('')
 
 const openProfileModal = () => {
+  currentPassword.value = ''
   newUsername.value = authStore.username
   newPassword.value = ''
+  profileError.value = ''
   dialog.value = true
 }
 
 const updateUser = async () => {
-  await modifyUser({ username: newUsername.value, password: newPassword.value })
+  profileError.value = ''
+
+  try {
+    await modifyUser({
+      currentPassword: currentPassword.value,
+      username: newUsername.value,
+      password: newPassword.value
+    })
+  } catch (e) {
+    profileError.value = e.message
+    return
+  }
+
   authStore.setUsername(newUsername.value)
+  // 변경된 username 이 access token 클레임에도 반영되도록 재발급
+  await refreshAccessToken()
   dialog.value = false
 }
 </script>
@@ -70,31 +45,30 @@ const updateUser = async () => {
 <template>
   <v-app-bar app elevation="1">
 
-    <div class="header-left">
-      <v-text-field v-model="hiddenInput" density="compact" hide-details variant="plain" class="easter-input"
-        @keyup.enter="handleHiddenInput" />
-    </div>
-
     <v-spacer />
 
     <div class="header-right">
-      <v-btn variant="text" size="small" class="mr-2" @click="goChat">
+      <v-btn variant="text" size="small" class="mr-2" to="/chat">
         Chat
       </v-btn>
 
-      <v-btn variant="text" size="small" class="mr-2" @click="goGame">
+      <v-btn variant="text" size="small" class="mr-2" to="/game">
         Game
       </v-btn>
 
-      <v-btn variant="text" size="small" class="mr-2" @click="goFiles">
+      <v-btn variant="text" size="small" class="mr-2" to="/files">
         Files
+      </v-btn>
+
+      <v-btn v-if="authStore.isAdmin" variant="text" size="small" class="mr-2" to="/admin/users">
+        Admin
       </v-btn>
 
       <v-btn variant="text" size="small" class="mr-2" @click="openProfileModal">
         {{ authStore.username }}
       </v-btn>
 
-      <v-btn color="error" size="small" variant="text" @click="logout">
+      <v-btn color="error" size="small" variant="text" @click="authStore.signout()">
         Logout
       </v-btn>
     </div>
@@ -107,9 +81,15 @@ const updateUser = async () => {
       <v-card-title>Account Settings</v-card-title>
 
       <v-card-text>
+        <v-text-field v-model="currentPassword" label="Current Password" type="password" density="compact" />
+
         <v-text-field v-model="newUsername" label="Username" density="compact" />
 
         <v-text-field v-model="newPassword" label="New Password" type="password" density="compact" />
+
+        <v-alert v-if="profileError" type="error" variant="tonal" density="compact">
+          {{ profileError }}
+        </v-alert>
       </v-card-text>
 
       <v-card-actions>
@@ -122,11 +102,6 @@ const updateUser = async () => {
 </template>
 
 <style scoped>
-.header-left {
-  display: flex;
-  align-items: center;
-}
-
 .header-right {
   display: flex;
   align-items: center;
@@ -140,16 +115,5 @@ const updateUser = async () => {
 
 .clickable:hover {
   opacity: 0.7;
-}
-
-.easter-input {
-  max-width: 200px;
-  margin-left: 8px;
-  opacity: 0.05;
-  transition: opacity 0.2s;
-}
-
-.easter-input:focus-within {
-  opacity: 1;
 }
 </style>

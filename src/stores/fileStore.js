@@ -94,12 +94,17 @@ export const useFileStore = defineStore('file', () => {
     return ids
   }
 
+  /**
+   * @returns {Set<number>} 삭제된 폴더 id 목록 (대상 폴더 + 모든 하위 폴더)
+   */
   const deleteFolder = async (folderId) => {
     await deleteFolderApi(folderId)
 
     const removedIds = new Set(collectSubtreeIds(folderId))
     folders.value = folders.value.filter(f => !removedIds.has(f.id))
     removedIds.forEach(id => delete filesByFolder.value[id])
+
+    return removedIds
   }
 
   const resolveUniqueEntryName = (file, nameCounts) => {

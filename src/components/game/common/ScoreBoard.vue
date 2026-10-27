@@ -5,20 +5,19 @@ import { fetchTop10 } from '@/api/gameApi'
 const props = defineProps({
   gameName: {
     type: String,
-    required: false
+    required: true
   }
 })
 
 const scores = ref([])
 const loading = ref(false)
 
-const reload = async (game) => {
-  const targetGame = game || props.gameName
-  if (!targetGame) return
-
+const reload = async () => {
   loading.value = true
   try {
-    scores.value = await fetchTop10(targetGame)
+    scores.value = await fetchTop10(props.gameName)
+  } catch (e) {
+    console.error('랭킹 조회 실패', e)
   } finally {
     loading.value = false
   }
@@ -26,11 +25,7 @@ const reload = async (game) => {
 
 defineExpose({ reload })
 
-onMounted(() => {
-  if (props.gameName) {
-    reload(props.gameName)
-  }
-})
+onMounted(reload)
 </script>
 
 <template>

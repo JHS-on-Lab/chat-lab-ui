@@ -2,7 +2,7 @@
 import { computed, ref, watch, nextTick, onMounted } from 'vue'
 import { useChatStore } from '@/stores/chatStore'
 import { useAuthStore } from '@/stores/authStore'
-import { formatMessage } from '@/lib/textFormatter'
+import { formatMessage, isSafeImageSrc } from '@/lib/textFormatter'
 import { useDisplay } from 'vuetify'
 
 const chatStore = useChatStore()
@@ -24,31 +24,47 @@ const currentMembers = computed(() => chatStore.currentMembers)
 const isTooLong = computed(() => text.value.length > MAX_MESSAGE_LENGTH)
 
 const messageError = computed(() => {
-  if (!isTooLong.value) return ''
-  return `메시지는 ${MAX_MESSAGE_LENGTH.toLocaleString()}자 이하만 전송할 수 있습니다.`
+  if (isTooLong.value) {
+    return `메시지는 ${MAX_MESSAGE_LENGTH.toLocaleString()}자 이하만 전송할 수 있습니다.`
+  }
+  // 연결 끊김 / 서버 거부 등 전송 실패 사유
+  return chatStore.sendError
 })
 
 const canSend = computed(() => {
   return text.value.trim().length > 0 && !isTooLong.value
 })
 
+// username 은 변경될 수 있으므로 사용자 id 로 비교
 const isMine = (msg) =>
-  msg.senderName === authStore.username
+  msg.senderId === authStore.userId
 
-const handleSend = async () => {
-  if (!text.value.trim()) return
-  if (isTooLong.value) return
+const handleSend = () => {
+  if (!canSend.value) return
 
-  chatStore.sendMessage(text.value)
-  text.value = ''
+  // 전송에 실패하면 입력 내용을 유지해 다시 보낼 수 있게 한다
+  if (chatStore.sendMessage(text.value)) {
+    text.value = ''
+  }
 }
 
+// 맨 위로 스크롤하면 이전 메시지를 불러오고, 보던 위치를 유지한다
 const handleScroll = async () => {
   const el = scrollBox.value
-  if (!el) return
-  if (el.scrollTop === 0) {
-    await chatStore.loadRoomMessages(chatStore.selectedRoomId)
-  }
+  if (!el || el.scrollTop !== 0) return
+
+  const prevHeight = el.scrollHeight
+  const loaded = await chatStore.loadRoomMessages(chatStore.selectedRoomId)
+  if (!loaded) return
+
+  await nextTick()
+  el.scrollTop = el.scrollHeight - prevHeight
+}
+
+const openInviteDialog = () => {
+  inviteUsername.value = ''
+  errorMessage.value = ''
+  dialog.value = true
 }
 
 const invite = async () => {
@@ -56,10 +72,9 @@ const invite = async () => {
   try {
     await chatStore.inviteMember(
       chatStore.selectedRoomId,
-      inviteUsername.value
+      inviteUsername.value.trim()
     )
     dialog.value = false
-    inviteUsername.value = ''
   } catch (error) {
     errorMessage.value = error.message
   }
@@ -87,8 +102,9 @@ watch(
   scrollToBottom
 )
 
+// 새 메시지가 아래에 추가될 때만 맨 아래로 이동 (이전 메시지 로딩 시에는 이동하지 않음)
 watch(
-  () => chatStore.messages[chatStore.selectedRoomId]?.length,
+  () => currentMessages.value.at(-1)?.id,
   scrollToBottom
 )
 
@@ -116,7 +132,7 @@ onMounted(scrollToBottom)
         </v-btn>
       </div>
 
-      <v-btn size="small" variant="text" @click="dialog = true">
+      <v-btn size="small" variant="text" @click="openInviteDialog">
         Invite
       </v-btn>
 
@@ -137,7 +153,7 @@ onMounted(scrollToBottom)
           </v-btn>
         </div>
 
-        <img v-if="msg.type === 'IMAGE'" :src="msg.content" class="bubble image" />
+        <img v-if="msg.type === 'IMAGE' && isSafeImageSrc(msg.content)" :src="msg.content" class="bubble image" />
 
       </div>
     </div>
@@ -153,8 +169,8 @@ onMounted(scrollToBottom)
         hide-details="auto"
         placeholder="메시지 입력..."
         class="flex-grow-1"
-        counter="20000"
-        :error="isTooLong"
+        :counter="MAX_MESSAGE_LENGTH"
+        :error="!!messageError"
         :error-messages="messageError ? [messageError] : []"
         @keydown.enter.exact.prevent="handleSend"
       />

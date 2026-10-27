@@ -29,6 +29,8 @@ export const useChatStore = defineStore('chat', () => {
   const hasNextMap = ref({})
   const loadingMap = ref({})
 
+  const sendError = ref('')
+
   // getters
   const hasRooms = computed(() => rooms.value.length > 0)
 
@@ -44,72 +46,87 @@ export const useChatStore = defineStore('chat', () => {
       : []
   )
 
+  // 같은 id 의 메시지가 중복으로 들어오지 않도록 병합 (구독과 히스토리 조회 사이 경합 대비)
+  const mergeMessages = (base, incoming) => {
+    const ids = new Set(base.map(m => m.id))
+    return [...base, ...incoming.filter(m => !ids.has(m.id))].sort((a, b) => a.id - b.id)
+  }
+
+  const clearRoomCache = (roomId) => {
+    delete messages.value[roomId]
+    delete members.value[roomId]
+    delete cursors.value[roomId]
+    delete hasNextMap.value[roomId]
+    delete loadingMap.value[roomId]
+  }
+
   // actions
   const initialize = async () => {
     connectSocket()
 
     await reloadRooms()
 
-    if (rooms.value.length > 0) {
-      await selectRoom(rooms.value[0].id)
+    // 이전에 보던 방이 있으면 유지, 없으면 첫 번째 방 선택
+    const target = selectedRoomId.value ?? rooms.value[0]?.id
+    if (target) {
+      await selectRoom(target, { force: true })
     }
   }
 
   const reloadRooms = async () => {
-    const data = await getMyRoomsApi()
+    rooms.value = await getMyRoomsApi()
 
-    const currentSelected = selectedRoomId.value
-
-    rooms.value = data
-
-    // 현재 선택된 방이 여전히 존재하는지 확인
-    if (currentSelected && !rooms.value.find(r => r.id === currentSelected)) {
-      selectedRoomId.value = null
+    // 현재 선택된 방이 더 이상 목록에 없으면 선택 해제
+    if (selectedRoomId.value && !rooms.value.some(r => r.id === selectedRoomId.value)) {
       unsubscribeRoom()
+      clearRoomCache(selectedRoomId.value)
+      selectedRoomId.value = null
     }
   }
 
-  const selectRoom = async (roomId) => {
-    if (selectedRoomId.value === roomId) return
+  const selectRoom = async (roomId, { force = false } = {}) => {
+    if (!force && selectedRoomId.value === roomId) return
 
-    // 이전 방 구독 해제
-    unsubscribeRoom()
-
+    sendError.value = ''
     selectedRoomId.value = roomId
 
-    // 데이터 로딩
+    // 구독하지 않던 동안의 메시지가 누락되지 않도록 캐시를 비우고 최신 페이지부터 다시 불러온다.
+    // 구독을 먼저 걸어 두어 조회 중 도착한 메시지도 받는다 (중복은 mergeMessages 에서 제거).
+    clearRoomCache(roomId)
+    subscribeRoom(roomId)
+
     await Promise.all([
       loadRoomMessages(roomId),
       loadRoomMembers(roomId)
     ])
-
-    // 새 방 구독
-    subscribeRoom(roomId)
   }
 
+  /**
+   * 이전(더 오래된) 메시지 한 페이지를 불러온다.
+   * @returns {boolean} 새로 불러온 메시지가 있는지 여부
+   */
   const loadRoomMessages = async (roomId) => {
-    if (loadingMap.value[roomId]) return
-    if (hasNextMap.value[roomId] === false) return
+    if (loadingMap.value[roomId]) return false
+    if (hasNextMap.value[roomId] === false) return false
 
     loadingMap.value[roomId] = true
 
-    const cursor = cursors.value[roomId] || null
-    const res = await getRoomMessagesApi(roomId, cursor)
+    try {
+      const res = await getRoomMessagesApi(roomId, cursors.value[roomId] ?? null)
 
-    const decodedMessages = await decodeMessageList(res.messages)
+      // 응답 대기 중 다른 방으로 이동했거나 방이 정리된 경우 결과를 버린다
+      if (!loadingMap.value[roomId]) return false
 
-    if (!messages.value[roomId]) {
-      messages.value[roomId] = []
+      messages.value[roomId] = mergeMessages(messages.value[roomId] ?? [], decodeMessageList(res.messages))
+      cursors.value[roomId] = res.nextCursor
+      hasNextMap.value[roomId] = res.hasNext
+
+      return res.messages.length > 0
+    } finally {
+      if (roomId in loadingMap.value) {
+        loadingMap.value[roomId] = false
+      }
     }
-
-    messages.value[roomId] = [
-      ...decodedMessages,
-      ...messages.value[roomId]
-    ]
-
-    cursors.value[roomId] = res.nextCursor
-    hasNextMap.value[roomId] = res.hasNext
-    loadingMap.value[roomId] = false
   }
 
   const loadRoomMembers = async (roomId) => {
@@ -118,34 +135,23 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   const addMessage = (roomId, message) => {
-    if (!messages.value[roomId]) {
-      messages.value[roomId] = []
-    }
-    messages.value[roomId].push(message)
+    messages.value[roomId] = mergeMessages(messages.value[roomId] ?? [], [message])
   }
 
   const leaveRoom = async (roomId) => {
     await leaveRoomApi(roomId)
 
-    // 현재 방이면 소켓 종료
-    if (selectedRoomId.value === roomId) {
-      unsubscribeRoom()
-    }
+    const wasSelected = selectedRoomId.value === roomId
 
     rooms.value = rooms.value.filter(r => r.id !== roomId)
+    clearRoomCache(roomId)
 
-    delete messages.value[roomId]
-    delete members.value[roomId]
-    delete cursors.value[roomId]
-    delete hasNextMap.value[roomId]
-    delete loadingMap.value[roomId]
+    if (wasSelected) {
+      unsubscribeRoom()
+      selectedRoomId.value = null
 
-    if (selectedRoomId.value === roomId) {
-      selectedRoomId.value =
-        rooms.value.length > 0 ? rooms.value[0].id : null
-
-      if (selectedRoomId.value) {
-        await selectRoom(selectedRoomId.value)
+      if (rooms.value.length > 0) {
+        await selectRoom(rooms.value[0].id)
       }
     }
   }
@@ -162,13 +168,28 @@ export const useChatStore = defineStore('chat', () => {
     return newRoom
   }
 
-const sendMessage = async (text) => {
-  if (!selectedRoomId.value) return
+  /**
+   * @returns {boolean} 전송 요청 성공 여부
+   */
+  const sendMessage = (text) => {
+    if (!selectedRoomId.value) return false
 
-  await sendChatMessage(selectedRoomId.value, {
-    content: text,
-    type: 'TEXT'
+    sendError.value = ''
+
+    const sent = sendChatMessage(selectedRoomId.value, {
+      content: text,
+      type: 'TEXT'
     })
+
+    if (!sent) {
+      sendError.value = '서버와 연결되어 있지 않습니다. 잠시 후 다시 시도해 주세요.'
+    }
+
+    return sent
+  }
+
+  const setSendError = (message) => {
+    sendError.value = message
   }
 
   const reset = () => {
@@ -181,6 +202,7 @@ const sendMessage = async (text) => {
     cursors.value = {}
     hasNextMap.value = {}
     loadingMap.value = {}
+    sendError.value = ''
   }
 
   return {
@@ -188,6 +210,7 @@ const sendMessage = async (text) => {
     selectedRoomId,
     messages,
     members,
+    sendError,
     hasRooms,
     currentMessages,
     currentMembers,
@@ -201,6 +224,7 @@ const sendMessage = async (text) => {
     createRoom,
     leaveRoom,
     sendMessage,
+    setSendError,
     reset
   }
 })

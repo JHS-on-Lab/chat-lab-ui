@@ -55,9 +55,10 @@ const deleteFolder = async () => {
   const folder = folderToDelete.value
   if (!folder) return
 
-  await fileStore.deleteFolder(folder.id)
+  const removedIds = await fileStore.deleteFolder(folder.id)
 
-  if (String(folder.id) === route.params.folderId) {
+  // 보고 있던 폴더가 삭제된 폴더 자신이거나 그 하위 폴더면 빈 화면으로 이동
+  if (removedIds.has(Number(route.params.folderId))) {
     router.push('/files')
   }
 

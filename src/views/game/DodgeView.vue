@@ -1,84 +1,28 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import GameRulePanel from '@/components/game/common/GameRulePanel.vue'
-import ScoreBoard from '@/components/game/common/ScoreBoard.vue'
+import GamePage from '@/components/game/common/GamePage.vue'
 import DodgeCanvas from '@/components/game/dodge/DodgeCanvas.vue'
-import { saveScore } from '@/api/gameApi'
-
-const scoreBoardRef = ref(null)
-const GAME_NAME = 'dodge'
-
-onMounted(() => {
-  scoreBoardRef.value.reload(GAME_NAME) // 게임 이름
-})
-
-const handleGameOver = async ({ score }) => {
-  await saveScore(GAME_NAME, score)
-  await scoreBoardRef.value.reload(GAME_NAME)
-}
 </script>
 
 <template>
-  <div class="dodge-layout">
-    <div class="left">
-      <DodgeCanvas @game-over="handleGameOver" />
-    </div>
+  <GamePage game-name="dodge">
+    <template #canvas="{ onGameOver }">
+      <DodgeCanvas @game-over="onGameOver" />
+    </template>
 
-    <div class="right">
-      <div class="rank">
-        <ScoreBoard ref="scoreBoardRef" />
-      </div>
-
-      <div class="rule">
-        <GameRulePanel>
-          <p>
-            사방에서 날아오는 장애물을 피하며 <strong>최대한 오래 버티는 것</strong>이 목표입니다.
-          </p>
-          <br />
-          <p>
-            점수 500점마다 <strong>Clear</strong> 스킬이 1개씩 지급됩니다.<br />
-            <strong>Space</strong> 키를 눌러 Clear를 사용하면
-            플레이어를 중심으로 파장이 퍼지며 모든 장애물이 제거됩니다.
-          </p>
-          <br />
-          <p>
-            시간이 지날수록 장애물의 속도와 생성 밀도가 증가하여 점점 더 어려워집니다.
-          </p>
-        </GameRulePanel>
-      </div>
-    </div>
-  </div>
+    <template #rules>
+      <p>
+        사방에서 날아오는 장애물을 피하며 <strong>최대한 오래 버티는 것</strong>이 목표입니다.
+      </p>
+      <br />
+      <p>
+        점수 500점마다 <strong>Clear</strong> 스킬이 1개씩 지급됩니다.<br />
+        <strong>Space</strong> 키를 눌러 Clear를 사용하면
+        플레이어를 중심으로 파장이 퍼지며 모든 장애물이 제거됩니다.
+      </p>
+      <br />
+      <p>
+        시간이 지날수록 장애물의 속도와 생성 밀도가 증가하여 점점 더 어려워집니다.
+      </p>
+    </template>
+  </GamePage>
 </template>
-
-<style scoped>
-.dodge-layout {
-  display: flex;
-  height: 100%;
-}
-
-.left {
-  flex: 2;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.right {
-  flex: 1;
-  border-left: 1px solid #ddd;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.rank,
-.rule {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-}
-
-.rank {
-  border-bottom: 1px solid #ddd;
-}
-</style>

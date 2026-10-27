@@ -2,166 +2,137 @@ import SockJS from 'sockjs-client'
 import { Client } from '@stomp/stompjs'
 import { useAuthStore } from '@/stores/authStore'
 import { useChatStore } from '@/stores/chatStore'
+import { refreshAccessToken } from '@/lib/axios'
 import { encodeMessage, decodeMessage } from '@/lib/chatCodec'
 
 let stompClient = null
 let roomSubscription = null
-let userSubscription = null
-let isConnected = false
+let subscribedRoomId = null
 
-const clearSubscriptions = () => {
-  if (userSubscription) {
-    userSubscription.unsubscribe()
-    userSubscription = null
-  }
-
-  if (roomSubscription) {
-    roomSubscription.unsubscribe()
-    roomSubscription = null
-  }
-}
-
-const forceLogout = async () => {
-  const authStore = useAuthStore()
-
-  isConnected = false
-  clearSubscriptions()
-
-  if (stompClient) {
-    stompClient.reconnectDelay = 0
-    await stompClient.deactivate()
-    stompClient = null
-  }
-
-  authStore.signout()
-}
-
-// const isAuthErrorFrame = (frame) => {
-//   const message = frame?.headers?.message ?? ''
-//   const body = frame?.body ?? ''
-//   const errorText = `${message} ${body}`
-
-//   return (
-//     errorText.includes('JWT') ||
-//     errorText.includes('Unauthorized') ||
-//     errorText.includes('UNAUTHORIZED') ||
-//     errorText.includes('Access Denied') ||
-//     errorText.includes('Authentication')
-//   )
-// }
+const isConnected = () => !!stompClient?.connected
 
 export const connectSocket = () => {
-  if (stompClient && stompClient.active) return
+  if (stompClient?.active) return
 
   const authStore = useAuthStore()
-  const token = authStore.token
+  if (!authStore.token) return
 
-  if (!token) {
-    forceLogout()
-    return
-  }
-
-  stompClient = new Client({
+  const client = new Client({
     webSocketFactory: () => new SockJS('/ws/chat'),
-    connectHeaders: {
-      Authorization: `Bearer ${token}`
-    },
     reconnectDelay: 5000,
 
-    onConnect: () => {
-      isConnected = true
-      subscribeUserChannel()
+    // (재)연결 직전마다 토큰을 재발급받아 사용한다.
+    // 최초 연결 시점의 토큰을 계속 쓰면 만료 이후 재연결이 항상 실패하기 때문.
+    beforeConnect: async () => {
+      try {
+        const token = await refreshAccessToken()
+        client.connectHeaders = { Authorization: `Bearer ${token}` }
+      } catch {
+        // refresh token 까지 만료 → 재연결 중단 후 로그아웃
+        await disconnectSocket()
+        authStore.signout()
+      }
+    },
 
+    onConnect: () => {
+      subscribeUserChannels()
+
+      // 재연결 시 기존에 보고 있던 방을 다시 구독
       const chatStore = useChatStore()
       if (chatStore.selectedRoomId) {
         subscribeRoom(chatStore.selectedRoomId)
       }
     },
 
-    onStompError: async (frame) => {
-      console.error('[STOMP ERROR]', frame)
-      isConnected = false
-
-      await forceLogout()
+    // ERROR 프레임 수신 시 서버가 연결을 끊으며, 클라이언트는 reconnectDelay 후 재연결한다.
+    onStompError: (frame) => {
+      console.error('[STOMP ERROR]', frame.headers?.message, frame.body)
     },
 
-    onWebSocketClose: (e) => {
-      isConnected = false
+    // 연결이 끊기면 기존 구독은 무효가 되므로 상태를 비워 재연결 시 다시 구독되게 한다.
+    onWebSocketClose: () => {
+      roomSubscription = null
+      subscribedRoomId = null
     },
 
     onWebSocketError: (e) => {
       console.error('[WS ERROR]', e)
-      isConnected = false
     },
 
     splitLargeFrames: true,
     maxWebSocketChunkSize: 8 * 1024
   })
 
-  stompClient.activate()
+  stompClient = client
+  client.activate()
 }
 
-const subscribeUserChannel = () => {
-  if (!stompClient || !stompClient.connected) return
-
+const subscribeUserChannels = () => {
   const chatStore = useChatStore()
 
-  userSubscription = stompClient.subscribe(
-    '/user/queue/rooms',
-    async () => {
-      await chatStore.reloadRooms()
-    }
-  )
+  // 다른 사용자가 나를 방에 초대한 경우
+  stompClient.subscribe('/user/queue/rooms', () => {
+    chatStore.reloadRooms()
+  })
+
+  // 내가 보낸 메시지 처리 실패 알림
+  stompClient.subscribe('/user/queue/errors', (message) => {
+    const body = JSON.parse(message.body)
+    chatStore.setSendError(body.message ?? '메시지 전송에 실패했습니다.')
+  })
 }
 
 export const subscribeRoom = (roomId) => {
-  if (!stompClient || !isConnected) return
+  if (!isConnected()) {
+    // 연결 완료(onConnect) 시 selectedRoomId 기준으로 구독된다.
+    return
+  }
+
+  if (roomSubscription && subscribedRoomId === roomId) return
+
+  unsubscribeRoom()
 
   const chatStore = useChatStore()
 
-  if (roomSubscription) {
-    roomSubscription.unsubscribe()
-  }
-
+  subscribedRoomId = roomId
   roomSubscription = stompClient.subscribe(
     `/topic/chat/rooms/${roomId}`,
-    async (message) => {
+    (message) => {
       const body = JSON.parse(message.body)
-      const decoded = await decodeMessage(body.data)
-      chatStore.addMessage(roomId, decoded)
+      chatStore.addMessage(roomId, decodeMessage(body.data))
     }
   )
 }
 
 export const unsubscribeRoom = () => {
-  if (roomSubscription) {
+  if (roomSubscription && isConnected()) {
     roomSubscription.unsubscribe()
-    roomSubscription = null
   }
+  roomSubscription = null
+  subscribedRoomId = null
 }
 
 export const disconnectSocket = async () => {
-  isConnected = false
-  clearSubscriptions()
+  roomSubscription = null
+  subscribedRoomId = null
 
   if (stompClient) {
-    stompClient.reconnectDelay = 0
-    await stompClient.deactivate()
+    const client = stompClient
     stompClient = null
+    await client.deactivate()
   }
 }
 
-export const sendChatMessage = async (roomId, payload) => {
-  if (!stompClient || !stompClient.connected) return
+/**
+ * @returns {boolean} 전송 요청 성공 여부 (연결되지 않았으면 false)
+ */
+export const sendChatMessage = (roomId, payload) => {
+  if (!isConnected()) return false
 
-  try {
-    const encoded = await encodeMessage(payload)
+  stompClient.publish({
+    destination: `/app/chat/rooms/${roomId}`,
+    body: JSON.stringify(encodeMessage(payload))
+  })
 
-    stompClient.publish({
-      destination: `/app/chat/rooms/${roomId}`,
-      body: JSON.stringify(encoded)
-    })
-  } catch (e) {
-    console.error('Message encryption failed', e)
-  }
+  return true
 }
