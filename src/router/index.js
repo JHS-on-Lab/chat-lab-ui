@@ -24,7 +24,8 @@ const routes = [
     children: [
       {
         path: '',
-        redirect: 'dodge'
+        // 상대 경로('dodge')는 현재 위치 기준으로 해석되어 /chat 에서 /dodge 로 가버리므로 절대 경로 사용
+        redirect: '/game/dodge'
       },
       {
         path: 'dodge',
